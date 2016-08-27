@@ -1,12 +1,11 @@
-structure O = Oauth.Make(struct
+structure G = Github.Make(struct
                              open Basic_in
-
-                             val authorize_url = bless "https://github.com/login/oauth/authorize"
-                             val access_token_url = bless "https://github.com/login/oauth/access_token"
+                             val https = False
                          end)
 
 val after =
-    return <xml>Welcome back.</xml>
+    u <- G.whoami;
+    return <xml>Welcome back, {[u]}.</xml>
 
 fun main () =
-    O.authorize {ReturnTo = url after}
+    G.authorize {ReturnTo = url after}

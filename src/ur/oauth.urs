@@ -4,6 +4,8 @@ signature S = sig
 
     val client_id : string
     val client_secret : string
+
+    val withToken : string -> transaction unit
 end
 
 functor Make(M : S) : sig

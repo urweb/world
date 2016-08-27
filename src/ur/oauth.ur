@@ -6,6 +6,8 @@ signature S = sig
 
     val client_id : string
     val client_secret : string
+
+    val withToken : string -> transaction unit
 end
 
 table states : { State : int, Expires : time }
@@ -92,7 +94,8 @@ functor Make(M : S) = struct
                             case token of
                                 Error msg => error <xml>OAuth error: {[msg]}</xml>
                               | Token token =>
-                                return <xml>Token: {[token]}</xml>
+                                withToken token;
+                                redirect (bless rt)
                     end
         in
             state <- rand;

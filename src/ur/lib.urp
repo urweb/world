@@ -5,5 +5,7 @@ effectful WorldFfi.post
 
 $/char
 $/string
+$/json
 urls
 oauth
+github
