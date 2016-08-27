@@ -1,0 +1,9 @@
+library config
+ffi worldFfi
+link -lurweb_world
+effectful WorldFfi.post
+
+$/char
+$/string
+urls
+oauth

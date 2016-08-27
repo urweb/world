@@ -1,0 +1,10 @@
+rewrite all Basic/*
+library ../src/ur
+safeGet main
+allow url https://github.com/*
+database dbname=basic
+sql basic.sql
+prefix http://localhost:8080/
+
+basic_in
+basic

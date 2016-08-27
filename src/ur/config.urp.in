@@ -1,0 +1,2 @@
+include @INCLUDE@/world.h
+link @LIBCURL@
