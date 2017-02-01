@@ -1,3 +1,7 @@
+(* This parameter controls how frequently we find an out-of-date GitHub profile
+ * and ask github.com for the latest data.  It's in seconds. *)
+val updateFrequency = 30
+
 open Json
 
 table users : { Login : string,
@@ -8,7 +12,8 @@ table users : { Login : string,
                 Location : option string,
                 Email : option string,
                 Hireable : option bool,
-                Bio : option string }
+                Bio : option string,
+                LastUpdated : time }
   PRIMARY KEY Login
 
 con users_hidden_constraints = _
@@ -51,40 +56,48 @@ val json_profile : json profile =
 functor Make(M : S) = struct
     open M
 
-    fun withToken tok =
-        profile <- WorldFfi.get (bless "https://api.github.com/user") (Some tok);
-        debug profile;
+    fun updateProfile url tokOpt =
+        profile <- WorldFfi.get url tokOpt;
         (profile : profile) <- return (Json.fromJson profile);
         exists <- oneRowE1 (SELECT COUNT( * ) > 0
                             FROM users
                             WHERE users.Login = {[profile.Login]});
+        if exists then
+            dml (UPDATE users
+                 SET AvatarUrl = {[profile.AvatarUrl]},
+                   Nam = {[profile.Nam]},
+                   Company = {[profile.Company]},
+                   Blog = {[profile.Blog]},
+                   Location = {[profile.Location]},
+                   Email = {[profile.Email]},
+                   Hireable = {[profile.Hireable]},
+                   Bio = {[profile.Bio]},
+                   LastUpdated = CURRENT_TIMESTAMP
+                 WHERE Login = {[profile.Login]});
+            return (profile.Login, True)
+        else
+            dml (INSERT INTO users(Login, AvatarUrl, Nam, Company, Blog, Location,
+                     Email, Hireable, Bio, LastUpdated)
+                 VALUES ({[profile.Login]}, {[profile.AvatarUrl]}, {[profile.Nam]},
+                     {[profile.Company]}, {[profile.Blog]}, {[profile.Location]},
+                     {[profile.Email]}, {[profile.Hireable]}, {[profile.Bio]},
+                     CURRENT_TIMESTAMP));
+            return (profile.Login, False)
+
+    fun withToken tok =
+        (login, exists) <- updateProfile (bless "https://api.github.com/user") (Some tok);
         secret <-
         (if exists then
-             dml (UPDATE users
-                  SET AvatarUrl = {[profile.AvatarUrl]},
-                    Nam = {[profile.Nam]},
-                    Company = {[profile.Company]},
-                    Blog = {[profile.Blog]},
-                    Location = {[profile.Location]},
-                    Email = {[profile.Email]},
-                    Hireable = {[profile.Hireable]},
-                    Bio = {[profile.Bio]}
-                  WHERE Login = {[profile.Login]});
              oneRowE1 (SELECT (secrets.Secret)
                        FROM secrets
-                       WHERE secrets.Login = {[profile.Login]})
+                       WHERE secrets.Login = {[login]})
          else
-             dml (INSERT INTO users(Login, AvatarUrl, Nam, Company, Blog, Location,
-                      Email, Hireable, Bio)
-                  VALUES ({[profile.Login]}, {[profile.AvatarUrl]}, {[profile.Nam]},
-                      {[profile.Company]}, {[profile.Blog]}, {[profile.Location]},
-                      {[profile.Email]}, {[profile.Hireable]}, {[profile.Bio]}));
              secret <- rand;
              dml (INSERT INTO secrets(Login, Secret)
-                  VALUES ({[profile.Login]}, {[secret]}));
+                  VALUES ({[login]}, {[secret]}));
              return secret);
 
-        setCookie user {Value = {Login = profile.Login, Secret = secret},
+        setCookie user {Value = {Login = login, Secret = secret},
                         Expires = None,
                         Secure = https}
 
@@ -109,4 +122,22 @@ functor Make(M : S) = struct
                 return (Some r.Login)
             else
                 error <xml>Invalid login information</xml>
+
+    fun trackUser login =
+        Monad.ignore (updateProfile (bless ("https://api.github.com/users/" ^ login)) None)
+
+    val oneDay = 60 * 60 * 24
+
+    task periodic updateFrequency = fn () =>
+         tm <- now;
+         oldTime <- return (addSeconds tm (-oneDay));
+         outOfDate <- oneOrNoRowsE1 (SELECT (users.Login)
+                                     FROM users
+                                     WHERE users.LastUpdated < {[oldTime]}
+                                     LIMIT 1);
+         case outOfDate of
+             None => return ()
+           | Some login =>
+             Monad.ignore (updateProfile (bless ("https://api.github.com/users/" ^ login)) None)
+             
 end
