@@ -20,4 +20,5 @@ functor Make(M : S) : sig
     val authorize : { ReturnTo : url } -> transaction page
     val whoami : transaction (option string)
     val trackUser : string -> transaction unit
+    val logout : transaction unit
 end

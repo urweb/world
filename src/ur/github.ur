@@ -139,5 +139,7 @@ functor Make(M : S) = struct
              None => return ()
            | Some login =>
              Monad.ignore (updateProfile (bless ("https://api.github.com/users/" ^ login)) None)
+
+    val logout = clearCookie user
              
 end
