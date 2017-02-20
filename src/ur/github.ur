@@ -62,40 +62,39 @@ functor Make(M : S) = struct
         exists <- oneRowE1 (SELECT COUNT( * ) > 0
                             FROM users
                             WHERE users.Login = {[profile.Login]});
-        if exists then
-            dml (UPDATE users
-                 SET AvatarUrl = {[profile.AvatarUrl]},
-                   Nam = {[profile.Nam]},
-                   Company = {[profile.Company]},
-                   Blog = {[profile.Blog]},
-                   Location = {[profile.Location]},
-                   Email = {[profile.Email]},
-                   Hireable = {[profile.Hireable]},
-                   Bio = {[profile.Bio]},
-                   LastUpdated = CURRENT_TIMESTAMP
-                 WHERE Login = {[profile.Login]});
-            return (profile.Login, True)
-        else
-            dml (INSERT INTO users(Login, AvatarUrl, Nam, Company, Blog, Location,
-                     Email, Hireable, Bio, LastUpdated)
-                 VALUES ({[profile.Login]}, {[profile.AvatarUrl]}, {[profile.Nam]},
-                     {[profile.Company]}, {[profile.Blog]}, {[profile.Location]},
-                     {[profile.Email]}, {[profile.Hireable]}, {[profile.Bio]},
-                     CURRENT_TIMESTAMP));
-            return (profile.Login, False)
+        (if exists then
+             dml (UPDATE users
+                  SET AvatarUrl = {[profile.AvatarUrl]},
+                    Nam = {[profile.Nam]},
+                    Company = {[profile.Company]},
+                    Blog = {[profile.Blog]},
+                    Location = {[profile.Location]},
+                    Email = {[profile.Email]},
+                    Hireable = {[profile.Hireable]},
+                    Bio = {[profile.Bio]},
+                    LastUpdated = CURRENT_TIMESTAMP
+                  WHERE Login = {[profile.Login]})
+         else
+             dml (INSERT INTO users(Login, AvatarUrl, Nam, Company, Blog, Location,
+                      Email, Hireable, Bio, LastUpdated)
+                  VALUES ({[profile.Login]}, {[profile.AvatarUrl]}, {[profile.Nam]},
+                      {[profile.Company]}, {[profile.Blog]}, {[profile.Location]},
+                      {[profile.Email]}, {[profile.Hireable]}, {[profile.Bio]},
+                      CURRENT_TIMESTAMP)));
+        return profile.Login
 
     fun withToken tok =
-        (login, exists) <- updateProfile (bless "https://api.github.com/user") (Some tok);
-        secret <-
-        (if exists then
-             oneRowE1 (SELECT (secrets.Secret)
-                       FROM secrets
-                       WHERE secrets.Login = {[login]})
-         else
-             secret <- rand;
-             dml (INSERT INTO secrets(Login, Secret)
-                  VALUES ({[login]}, {[secret]}));
-             return secret);
+        login <- updateProfile (bless "https://api.github.com/user") (Some tok);
+        secret <- oneOrNoRowsE1 (SELECT (secrets.Secret)
+                                 FROM secrets
+                                 WHERE secrets.Login = {[login]});
+        secret <- (case secret of
+                       Some secret => return secret
+                     | None =>
+                       secret <- rand;
+                       dml (INSERT INTO secrets(Login, Secret)
+                            VALUES ({[login]}, {[secret]}));
+                       return secret);
 
         setCookie user {Value = {Login = login, Secret = secret},
                         Expires = None,
