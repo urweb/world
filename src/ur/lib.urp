@@ -6,6 +6,7 @@ effectful WorldFfi.post
 $/char
 $/string
 $/json
+$/monad
 urls
 oauth
 github
