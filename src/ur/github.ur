@@ -120,7 +120,7 @@ functor Make(M : S) = struct
             if ok then
                 return (Some r.Login)
             else
-                error <xml>Invalid login information</xml>
+                return None
 
     fun trackUser login =
         Monad.ignore (updateProfile (bless ("https://api.github.com/users/" ^ login)) None)
