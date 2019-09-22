@@ -7,6 +7,8 @@ $/char
 $/string
 $/json
 $/monad
+$/option
 urls
 oauth
 github
+google

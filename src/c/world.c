@@ -116,7 +116,7 @@ uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_st
   slist = curl_slist_append(slist, "User-Agent: Ur/Web World library");
 
   if (auth) {
-    uw_Basis_string header = uw_Basis_strcat(ctx, "Authorization: token ", auth);
+    uw_Basis_string header = uw_Basis_strcat(ctx, "Authorization: ", auth);
     slist = curl_slist_append(slist, header);
   }
 

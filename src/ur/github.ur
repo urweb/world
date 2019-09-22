@@ -57,7 +57,7 @@ functor Make(M : S) = struct
     open M
 
     fun updateProfile url tokOpt =
-        profile <- WorldFfi.get url tokOpt;
+        profile <- WorldFfi.get url (Option.mp (fn s => "token " ^ s) tokOpt);
         (profile : profile) <- return (Json.fromJson profile);
         exists <- oneRowE1 (SELECT COUNT( * ) > 0
                             FROM users
@@ -106,6 +106,7 @@ functor Make(M : S) = struct
                         val authorize_url = bless "https://github.com/login/oauth/authorize"
                         val access_token_url = bless "https://github.com/login/oauth/access_token"
                         val withToken = withToken
+                        val scope = None
                     end)
 
     val whoami =

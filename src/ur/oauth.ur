@@ -1,3 +1,4 @@
+open Json
 open Urls
 
 signature S = sig
@@ -6,6 +7,7 @@ signature S = sig
 
     val client_id : string
     val client_secret : string
+    val scope : option string
 
     val withToken : string -> transaction unit
 end
@@ -20,6 +22,12 @@ task periodic 300 = fn () =>
 datatype access_response =
          Token of string
        | Error of string
+
+type token_response = {Token : string}
+val _ : json token_response = json_record {Token = "access_token"}
+
+type error_response = {Error : string}
+val _ : json error_response = json_record {Error = "error_description"}
 
 functor Make(M : S) = struct
     open M
@@ -42,7 +50,7 @@ functor Make(M : S) = struct
                                        | Some state =>
                                          case read state of
                                              None => error <xml>Noninteger state in OAuth authorization response</xml>
-                                           | Some state => (code, state))
+                                           | Some state => (urldecode code, state))
                               | Some (param, s) =>
                                 let
                                     val (value, rest) =
@@ -55,12 +63,10 @@ functor Make(M : S) = struct
                                     (if param = "state" then Some value else state)
                                 end
 
-                        fun parse2 s token =
+                        (* This parser assumes a URL-encoded query string. *)
+                        fun parse2' s token =
                             case String.split s #"=" of
-                                None =>
-                                (case token of
-                                     None => error <xml>No token in OAuth access response</xml>
-                                   | Some token => token)
+                                None => token
                               | Some (param, s) =>
                                 let
                                     val (value, rest) =
@@ -68,12 +74,26 @@ functor Make(M : S) = struct
                                             None => (s, "")
                                           | Some p => p
                                 in
-                                    parse2 rest
+                                    parse2' rest
                                     (case param of
                                          "access_token" => Some (Token (urldecode value))
                                        | "error_description" => Some (Error (urldecode value))
                                        | _ => token)
                                 end
+
+                        (* This parser first attempts the last one,
+                         * falling back on JSON if inapplicable. *)
+                        fun parse2 s =
+                            case parse2' s None of
+                                None =>
+                                (case String.split s #"\"" of
+                                     None => error <xml>No token in OAuth access response</xml>
+                                   | Some (_, rest) =>
+                                     if String.isPrefix {Full = rest, Prefix = "error"} then
+                                         Error ((fromJson s : error_response).Error)
+                                     else
+                                         Token ((fromJson s : token_response).Token))
+                              | Some tok => tok
 
                         val (code, state) = parse1 (show qs) None None
                     in
@@ -89,8 +109,9 @@ functor Make(M : S) = struct
                                                 ("client_id=" ^ urlencode client_id
                                                  ^ "&client_secret=" ^ urlencode client_secret
                                                  ^ "&code=" ^ urlencode code
-                                                 ^ "&state=" ^ show state);
-                            token <- return (parse2 pb None);
+                                                 ^ "&grant_type=authorization_code"
+                                                 ^ "&redirect_uri=" ^ urlencode (show (effectfulUrl (authorized (show rt)))));
+                            token <- return (parse2 pb);
                             case token of
                                 Error msg => error <xml>OAuth error: {[msg]}</xml>
                               | Token token =>
@@ -105,6 +126,10 @@ functor Make(M : S) = struct
             redirect (bless (show authorize_url
                              ^ "?client_id=" ^ urlencode client_id
                              ^ "&redirect_uri=" ^ urlencode (show (effectfulUrl (authorized (show rt))))
-                             ^ "&state=" ^ show state))
+                             ^ "&state=" ^ show state
+                             ^ "&response_type=code"
+                             ^ (case scope of
+                                    None => ""
+                                  | Some scope => "&scope=" ^ scope)))
         end
 end
