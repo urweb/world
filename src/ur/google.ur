@@ -88,7 +88,46 @@ val _ : json message = json_record {Id = "id",
                                     ThreadId = "threadId"}
 val _ : json messages = json_record {Messages = "messages",
                                      ResultSizeEstimate = "resultSizeEstimate"}
-                       
+
+type label_id = string
+val show_label_id = _
+
+type header = {
+     Nam : string,
+     Value : string
+}
+val _ : json header = json_record {Nam = "name",
+                                   Value = "value"}
+
+type payload_metadata = {
+     MimeType : string,
+     Headers : list header
+}
+val _ : json payload_metadata = json_record {MimeType = "mimeType",
+                                             Headers = "headers"}
+
+type history_id = string
+val show_history_id = _
+
+type message_metadata = {
+     Id : message_id,
+     ThreadId : thread_id,
+     LabelIds : list label_id,
+     Snippet : string,
+     HistoryId : history_id,
+     InternalDate : string,
+     Payload : payload_metadata,
+     SizeEstimate : int
+}
+val _ : json message_metadata = json_record {Id = "id",
+                                             ThreadId = "threadId",
+                                             LabelIds = "labelIds",
+                                             Snippet = "snippet",
+                                             HistoryId = "historyId",
+                                             InternalDate = "internalDate",
+                                             Payload = "payload",
+                                             SizeEstimate = "sizeEstimate"}
+
 functor Gmail(M : S) = struct
     open M
 
@@ -97,7 +136,7 @@ functor Gmail(M : S) = struct
       PRIMARY KEY Secret
          
     cookie user : int
-         
+
     fun withToken tok =
         secret <- rand;
         dml (INSERT INTO secrets(Secret, Token)
@@ -136,4 +175,8 @@ functor Gmail(M : S) = struct
         s <- api (bless "https://www.googleapis.com/gmail/v1/users/me/messages");
         return (fromJson s)
         (*api (bless "https://www.googleapis.com/gmail/v1/users/me/history?historyTypes=messageAdded&startHistoryId=0")*)
+
+    fun messageMetadata id =
+        s <- api (bless ("https://www.googleapis.com/gmail/v1/users/me/messages/" ^ id ^ "?format=metadata"));
+        return (fromJson s)
 end

@@ -28,10 +28,38 @@ type messages = {
      Messages : list message,
      ResultSizeEstimate : int
 }
-                       
+
+type label_id
+val show_label_id : show label_id
+
+type header = {
+     Nam : string,
+     Value : string
+}
+
+type payload_metadata = {
+     MimeType : string,
+     Headers : list header
+}
+
+type history_id
+val show_history_id : show history_id
+
+type message_metadata = {
+     Id : message_id,
+     ThreadId : thread_id,
+     LabelIds : list label_id,
+     Snippet : string,
+     HistoryId : history_id,
+     InternalDate : string,
+     Payload : payload_metadata,
+     SizeEstimate : int
+}
+
 functor Gmail(M : S) : sig
     val authorize : { ReturnTo : url } -> transaction page
     val logout : transaction unit
 
     val messages : transaction messages
+    val messageMetadata : message_id -> transaction message_metadata
 end
