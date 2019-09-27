@@ -37,26 +37,26 @@ static uw_Basis_string doweb(uw_context ctx, CURL *c, uw_Basis_string url, int e
   if (strncmp(url, "https://", 8))
     uw_error(ctx, FATAL, "World: URL is not HTTPS");
 
-  uw_buffer *buf = uw_malloc(ctx, sizeof(uw_buffer));
+  uw_buffer buf;
   char error_buffer[CURL_ERROR_SIZE];
   CURLcode code;
 
-  uw_buffer_init(BUF_MAX, buf, BUF_INIT);
-  uw_push_cleanup(ctx, (void (*)(void *))uw_buffer_free, buf);
+  uw_buffer_init(BUF_MAX, &buf, BUF_INIT);
+  uw_push_cleanup(ctx, (void (*)(void *))uw_buffer_free, &buf);
 
   curl_easy_setopt(c, CURLOPT_URL, url);
   curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_buffer_data);
-  curl_easy_setopt(c, CURLOPT_WRITEDATA, buf);
+  curl_easy_setopt(c, CURLOPT_WRITEDATA, &buf);
   curl_easy_setopt(c, CURLOPT_ERRORBUFFER, error_buffer);
 
   code = curl_easy_perform(c);
 
   if (code) {
     if (encode_errors) {
-      uw_buffer_reset(buf);
-      uw_buffer_append(buf, curl_failure, sizeof curl_failure - 1);
+      uw_buffer_reset(&buf);
+      uw_buffer_append(&buf, curl_failure, sizeof curl_failure - 1);
       char *message = curl_easy_escape(c, error_buffer, 0);
-      uw_buffer_append(buf, message, strlen(message));
+      uw_buffer_append(&buf, message, strlen(message));
       curl_free(message);
     } else
       uw_error(ctx, FATAL, "Error fetching URL: %s", error_buffer);
@@ -65,20 +65,20 @@ static uw_Basis_string doweb(uw_context ctx, CURL *c, uw_Basis_string url, int e
     curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &http_code);
 
     if (http_code == 200)
-      uw_buffer_append(buf, "", 1);
+      uw_buffer_append(&buf, "", 1);
     else if (encode_errors) {
-      uw_buffer_reset(buf);
-      uw_buffer_append(buf, server_failure, sizeof server_failure - 1);
+      uw_buffer_reset(&buf);
+      uw_buffer_append(&buf, server_failure, sizeof server_failure - 1);
       char *message = curl_easy_escape(c, error_buffer, 0);
-      uw_buffer_append(buf, message, strlen(message));
+      uw_buffer_append(&buf, message, strlen(message));
       curl_free(message);
     } else {
-      uw_buffer_append(buf, "", 1);
-      uw_error(ctx, FATAL, "Error response from remote server: %s", buf->start);
+      uw_buffer_append(&buf, "", 1);
+      uw_error(ctx, FATAL, "Error response from remote server: %s", buf.start);
     }
   } 
 
-  char *ret = uw_strdup(ctx, buf->start);
+  char *ret = uw_strdup(ctx, buf.start);
   uw_pop_cleanup(ctx);
   return ret;
 }
