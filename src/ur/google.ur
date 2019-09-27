@@ -80,14 +80,12 @@ type message = {
 }
 
 type messages = {
-     Messages : list message,
-     ResultSizeEstimate : int
+     Messages : list message
 }
 
 val _ : json message = json_record {Id = "id",
                                     ThreadId = "threadId"}
-val _ : json messages = json_record {Messages = "messages",
-                                     ResultSizeEstimate = "resultSizeEstimate"}
+val _ : json messages = json_record {Messages = "messages"}
 
 type label_id = string
 val show_label_id = _
@@ -108,6 +106,8 @@ val _ : json payload_metadata = json_record {MimeType = "mimeType",
 
 type history_id = string
 val show_history_id = _
+val ord_history_id = mkOrd {Lt = fn a b => (readError a : int) < readError b,
+                            Le = fn a b => (readError a : int) <= readError b}
 
 type message_metadata = {
      Id : message_id,
@@ -128,6 +128,30 @@ val _ : json message_metadata = json_record {Id = "id",
                                              Payload = "payload",
                                              SizeEstimate = "sizeEstimate"}
 
+type hmessage = {
+     Id : message_id,
+     ThreadId : thread_id,
+     LabelIds : list string
+}
+val _ : json hmessage = json_record {Id = "id",
+                                     ThreadId = "threadId",
+                                     LabelIds = "labelIds"}
+                                
+type ma_item = {
+     Message : hmessage
+}
+val _ : json ma_item = json_record {Message = "message"}
+                                
+type history_item = {
+     MessagesAdded : list ma_item
+}
+val _ : json history_item = json_record {MessagesAdded = "messagesAdded"}
+                                
+type history = {
+     History : list history_item
+}
+val _ : json history = json_record {History = "history"}
+                                
 functor Gmail(M : S) = struct
     open M
 
@@ -173,10 +197,18 @@ functor Gmail(M : S) = struct
         
     val messages =
         s <- api (bless "https://www.googleapis.com/gmail/v1/users/me/messages");
-        return (fromJson s)
-        (*api (bless "https://www.googleapis.com/gmail/v1/users/me/history?historyTypes=messageAdded&startHistoryId=0")*)
+        return (fromJson s : messages).Messages
 
     fun messageMetadata id =
         s <- api (bless ("https://www.googleapis.com/gmail/v1/users/me/messages/" ^ id ^ "?format=metadata"));
         return (fromJson s)
+
+    fun history hid =
+        s <- api (bless ("https://www.googleapis.com/gmail/v1/users/me/history?historyTypes=messageAdded&startHistoryId=" ^ hid));
+        case String.sindex {Haystack = s, Needle = "\"history\""} of
+            None => return []
+          | Some _ =>
+            (h : history) <- return (fromJson s);
+            ms <- return (List.foldl (fn hi ms => List.append (List.mp (fn r => r.Message) hi.MessagesAdded) ms) [] h.History);
+            return (List.mapPartial (fn m => if List.mem "DRAFT" m.LabelIds then None else Some (m -- #LabelIds)) ms)
 end

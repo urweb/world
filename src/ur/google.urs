@@ -24,11 +24,6 @@ type message = {
      ThreadId : thread_id
 }
 
-type messages = {
-     Messages : list message,
-     ResultSizeEstimate : int
-}
-
 type label_id
 val show_label_id : show label_id
 
@@ -44,6 +39,7 @@ type payload_metadata = {
 
 type history_id
 val show_history_id : show history_id
+val ord_history_id : ord history_id
 
 type message_metadata = {
      Id : message_id,
@@ -60,6 +56,7 @@ functor Gmail(M : S) : sig
     val authorize : { ReturnTo : url } -> transaction page
     val logout : transaction unit
 
-    val messages : transaction messages
+    val messages : transaction (list message)
     val messageMetadata : message_id -> transaction message_metadata
+    val history : history_id -> transaction (list message)
 end

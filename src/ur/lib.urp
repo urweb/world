@@ -8,6 +8,7 @@ $/string
 $/json
 $/monad
 $/option
+$/list
 urls
 oauth
 github
