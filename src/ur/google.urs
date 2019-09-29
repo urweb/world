@@ -55,7 +55,8 @@ type message_metadata = {
 functor Gmail(M : S) : sig
     val authorize : { ReturnTo : url } -> transaction page
     val logout : transaction unit
-
+    val loggedIn : transaction bool
+                 
     val messages : transaction (list message)
     val messageMetadata : message_id -> transaction message_metadata
     val history : history_id -> transaction (list message)

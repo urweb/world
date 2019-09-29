@@ -178,7 +178,8 @@ functor Gmail(M : S) = struct
                     end)
 
     val logout = clearCookie user
-
+    val loggedIn = v <- getCookie user; return (Option.isSome v)
+                 
     val token =
         c <- getCookie user;
         case c of
