@@ -110,6 +110,7 @@ type history_id = string
 val show_history_id = _
 val ord_history_id = mkOrd {Lt = fn a b => (readError a : int) < readError b,
                             Le = fn a b => (readError a : int) <= readError b}
+val inj_history_id = _
 
 type message_metadata = {
      Id : message_id,
@@ -150,9 +151,10 @@ type history_item = {
 val _ : json history_item = json_record {MessagesAdded = "messagesAdded"}
                                 
 type history = {
-     History : list history_item
+     History : list history_item,
+     HistoryId : history_id
 }
-val _ : json history = json_record {History = "history"}
+val _ : json history = json_record {History = "history", HistoryId = "historyId"}
 
 type gmail_profile = {
      EmailAddress : string
@@ -245,11 +247,11 @@ functor Gmail(M : S) = struct
     fun history hid =
         s <- api (bless ("https://www.googleapis.com/gmail/v1/users/me/history?historyTypes=messageAdded&startHistoryId=" ^ hid));
         case String.sindex {Haystack = s, Needle = "\"history\""} of
-            None => return []
+            None => return ([], None)
           | Some _ =>
             (h : history) <- return (fromJson s);
             ms <- return (List.foldl (fn hi ms => List.append (List.mp (fn r => r.Message) hi.MessagesAdded) ms) [] h.History);
-            return (List.mapPartial (fn m => if List.mem "DRAFT" m.LabelIds then None else Some (m -- #LabelIds)) ms)
+            return (List.mapPartial (fn m => if List.mem "DRAFT" m.LabelIds then None else Some (m -- #LabelIds)) ms, Some h.HistoryId)
 
     fun ofThread tid =
         addr <- emailAddress;

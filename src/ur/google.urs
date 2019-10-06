@@ -42,7 +42,8 @@ type payload_metadata = {
 type history_id
 val show_history_id : show history_id
 val ord_history_id : ord history_id
-
+val inj_history_id : sql_injectable_prim history_id
+                     
 type message_metadata = {
      Id : message_id,
      ThreadId : thread_id,
@@ -62,7 +63,7 @@ functor Gmail(M : S) : sig
                  
     val messages : transaction (list message)
     val messageMetadata : message_id -> transaction message_metadata
-    val history : history_id -> transaction (list message)
+    val history : history_id -> transaction (list message * option history_id (* use for next call *))
 
     val ofThread : thread_id -> transaction url (* user-specific URL to a thread on Gmail *)
 end
