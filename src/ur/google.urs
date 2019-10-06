@@ -15,9 +15,11 @@ end
 
 type message_id
 val show_message_id : show message_id
-     
+val eq_message_id : eq message_id
+
 type thread_id
 val show_thread_id : show thread_id
+val eq_thread_id : eq thread_id
 
 type message = {
      Id : message_id,
@@ -56,8 +58,11 @@ functor Gmail(M : S) : sig
     val authorize : { ReturnTo : url } -> transaction page
     val logout : transaction unit
     val loggedIn : transaction bool
+    val emailAddress : transaction string (* ...of the logged-in user *)
                  
     val messages : transaction (list message)
     val messageMetadata : message_id -> transaction message_metadata
     val history : history_id -> transaction (list message)
+
+    val ofThread : thread_id -> transaction url (* user-specific URL to a thread on Gmail *)
 end

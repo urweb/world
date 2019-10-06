@@ -70,9 +70,11 @@ end
 
 type message_id = string
 val show_message_id = _
+val eq_message_id = _
 
 type thread_id = string
 val show_thread_id = _
+val eq_thread_id = _
 
 type message = {
      Id : message_id,
@@ -151,7 +153,12 @@ type history = {
      History : list history_item
 }
 val _ : json history = json_record {History = "history"}
-                                
+
+type gmail_profile = {
+     EmailAddress : string
+}
+val _ : json gmail_profile = json_record {EmailAddress = "emailAddress"}
+                       
 functor Gmail(M : S) = struct
     open M
 
@@ -160,6 +167,7 @@ functor Gmail(M : S) = struct
       PRIMARY KEY Secret
          
     cookie user : int
+    cookie email : string
 
     fun withToken tok =
         secret <- rand;
@@ -177,7 +185,7 @@ functor Gmail(M : S) = struct
                         val scope = Some "https://www.googleapis.com/auth/gmail.readonly"
                     end)
 
-    val logout = clearCookie user
+    val logout = clearCookie user; clearCookie email
     val loggedIn = v <- getCookie user; return (Option.isSome v)
                  
     val token =
@@ -195,6 +203,18 @@ functor Gmail(M : S) = struct
     fun api url =
         tok <- token;
         WorldFfi.get url (Some ("Bearer " ^ tok))
+
+    val emailAddress =
+        r <- getCookie email;
+        case r of
+            Some r => return r
+          | None =>
+            s <- api (bless "https://www.googleapis.com/gmail/v1/users/me/profile");
+            r <- return (fromJson s : gmail_profile).EmailAddress;
+            setCookie email {Value = r,
+                             Expires = None,
+                             Secure = https};
+            return r
         
     val messages =
         s <- api (bless "https://www.googleapis.com/gmail/v1/users/me/messages");
@@ -212,4 +232,8 @@ functor Gmail(M : S) = struct
             (h : history) <- return (fromJson s);
             ms <- return (List.foldl (fn hi ms => List.append (List.mp (fn r => r.Message) hi.MessagesAdded) ms) [] h.History);
             return (List.mapPartial (fn m => if List.mem "DRAFT" m.LabelIds then None else Some (m -- #LabelIds)) ms)
+
+    fun ofThread tid =
+        addr <- emailAddress;
+        return (bless ("https://mail.google.com/mail?authuser=" ^ addr ^ "#all/" ^ tid))
 end
