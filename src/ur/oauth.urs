@@ -6,7 +6,7 @@ signature S = sig
     val client_secret : string
     val scope : option string
 
-    val withToken : string -> transaction unit
+    val withToken : {Token : string, Expiration : option int (* seconds from now *)} -> transaction unit
 end
 
 functor Make(M : S) : sig

@@ -83,7 +83,7 @@ functor Make(M : S) = struct
                       CURRENT_TIMESTAMP)));
         return profile.Login
 
-    fun withToken tok =
+    fun withToken {Token = tok, ...} =
         login <- updateProfile (bless "https://api.github.com/user") (Some tok);
         secret <- oneOrNoRowsE1 (SELECT (secrets.Secret)
                                  FROM secrets

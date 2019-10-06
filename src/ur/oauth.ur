@@ -9,7 +9,7 @@ signature S = sig
     val client_secret : string
     val scope : option string
 
-    val withToken : string -> transaction unit
+    val withToken : {Token : string, Expiration : option int} -> transaction unit
 end
 
 table states : { State : int, Expires : time }
@@ -23,8 +23,8 @@ datatype access_response =
          Token of string
        | Error of string
 
-type token_response = {Token : string}
-val _ : json token_response = json_record {Token = "access_token"}
+type token_response = {Token : string, Expires : int}
+val _ : json token_response = json_record {Token = "access_token", Expires = "expires_in"}
 
 type error_response = {Error : string}
 val _ : json error_response = json_record {Error = "error_description"}
@@ -50,7 +50,8 @@ functor Make(M : S) = struct
                                        | Some state =>
                                          case read state of
                                              None => error <xml>Noninteger state in OAuth authorization response</xml>
-                                           | Some state => (urldecode code, state))
+                                           | Some state =>
+                                             (urldecode code, state))
                               | Some (param, s) =>
                                 let
                                     val (value, rest) =
@@ -64,9 +65,12 @@ functor Make(M : S) = struct
                                 end
 
                         (* This parser assumes a URL-encoded query string. *)
-                        fun parse2' s token =
+                        fun parse2' s token expiry =
                             case String.split s #"=" of
-                                None => token
+                                None =>
+                                (case token of
+                                     None => None
+                                   | Some token => Some (token, expiry))
                               | Some (param, s) =>
                                 let
                                     val (value, rest) =
@@ -79,21 +83,31 @@ functor Make(M : S) = struct
                                          "access_token" => Some (Token (urldecode value))
                                        | "error_description" => Some (Error (urldecode value))
                                        | _ => token)
+                                    (case param of
+                                         "expires_in" =>
+                                         (case read (urldecode value) of
+                                              None => error <xml>Malformed expiration in OAuth response</xml>
+                                            | Some n => Some n)
+                                       | _ => expiry)
                                 end
 
                         (* This parser first attempts the last one,
                          * falling back on JSON if inapplicable. *)
                         fun parse2 s =
-                            case parse2' s None of
+                            case parse2' s None None of
                                 None =>
                                 (case String.split s #"\"" of
                                      None => error <xml>No token in OAuth access response</xml>
                                    | Some (_, rest) =>
                                      if String.isPrefix {Full = rest, Prefix = "error"} then
-                                         Error ((fromJson s : error_response).Error)
+                                         (Error ((fromJson s : error_response).Error), None)
                                      else
-                                         Token ((fromJson s : token_response).Token))
-                              | Some tok => tok
+                                         let
+                                             val r = fromJson s : token_response
+                                         in
+                                             (Token r.Token, Some r.Expires)
+                                         end)
+                              | Some p => p
 
                         val (code, state) = parse1 (show qs) None None
                     in
@@ -111,11 +125,11 @@ functor Make(M : S) = struct
                                                  ^ "&code=" ^ urlencode code
                                                  ^ "&grant_type=authorization_code"
                                                  ^ "&redirect_uri=" ^ urlencode (show (effectfulUrl (authorized (show rt)))));
-                            token <- return (parse2 pb);
+                            (token, expiry) <- return (parse2 pb);
                             case token of
                                 Error msg => error <xml>OAuth error: {[msg]}</xml>
                               | Token token =>
-                                withToken token;
+                                withToken {Token = token, Expiration = expiry};
                                 redirect (bless rt)
                     end
         in

@@ -25,7 +25,7 @@ functor Login(M : S) = struct
                     
     cookie user : { ResourceName : string, Secret : int }
 
-    fun withToken tok =
+    fun withToken {Token = tok, ...} =
         profile <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses") (Some ("Bearer " ^ tok));
         (profile : profile) <- return (Json.fromJson profile);
         secret <- oneOrNoRowsE1 (SELECT (secrets.Secret)
@@ -163,19 +163,29 @@ functor Gmail(M : S) = struct
     open M
 
     table secrets : { Secret : int,
-                      Token : string }
+                      Token : string,
+                      Expires : time }
       PRIMARY KEY Secret
-         
+
+    task periodic 60 = fn () =>
+                          tm <- now;
+                          dml (DELETE FROM secrets
+                               WHERE Expires < {[addSeconds tm (-60)]})
+
     cookie user : int
     cookie email : string
 
-    fun withToken tok =
-        secret <- rand;
-        dml (INSERT INTO secrets(Secret, Token)
-             VALUES ({[secret]}, {[tok]}));
-        setCookie user {Value = secret,
-                        Expires = None,
-                        Secure = https}
+    fun withToken {Token = tok, Expiration = seconds, ...} =
+        case seconds of
+            None => error <xml>Missing token expiration in OAuth response</xml>
+          | Some seconds =>
+            secret <- rand;
+            tm <- now;
+            dml (INSERT INTO secrets(Secret, Token, Expires)
+                 VALUES ({[secret]}, {[tok]}, {[addSeconds tm (seconds * 3 / 4)]}));
+            setCookie user {Value = secret,
+                            Expires = None,
+                            Secure = https}
 
     open Oauth.Make(struct
                         open M
@@ -186,7 +196,14 @@ functor Gmail(M : S) = struct
                     end)
 
     val logout = clearCookie user; clearCookie email
-    val loggedIn = v <- getCookie user; return (Option.isSome v)
+    val loggedIn =
+        v <- getCookie user;
+        case v of
+            None => return False
+          | Some secret => oneRowE1 (SELECT COUNT( * ) > 0
+                                     FROM secrets
+                                     WHERE secrets.Secret = {[secret]}
+                                       AND secrets.Expires > CURRENT_TIMESTAMP)
                  
     val token =
         c <- getCookie user;
@@ -195,7 +212,8 @@ functor Gmail(M : S) = struct
           | Some n =>
             tokopt <- oneOrNoRowsE1 (SELECT (secrets.Token)
                                      FROM secrets
-                                     WHERE secrets.Secret = {[n]});
+                                     WHERE secrets.Secret = {[n]}
+                                       AND secrets.Expires > CURRENT_TIMESTAMP);
             case tokopt of
                 None => error <xml>You must be logged into Google to use this feature.</xml>
               | Some tok => return tok
