@@ -280,22 +280,31 @@ type event_id = string
 val show_event_id = _
 val eq_event_id = _
 
+datatype when =
+         Time of time
+       | Date of {Year : int, Month : int, Day : int}
+
+val show_when = mkShow (fn w =>
+                           case w of
+                               Time t => show t
+                             | Date r => show r.Year ^ "/" ^ show r.Month ^ "/" ^ show r.Day)
+
 type event = {
      Id : event_id,
      Summary : string,
      Description : option string,
-     Start : time,
-     End : time
+     Start : when,
+     End : when
 }
 
 type internal_event = {
      Id : event_id,
      Summary : string,
      Description : option string,
-     Start : {DateTime : time},
-     End : {DateTime : time}
+     Start : {DateTime : option time, Date : option string},
+     End : {DateTime : option time, Date : option string}
 }
-val _ : json {DateTime : time} = json_record {DateTime = "dateTime"}
+val _ : json {DateTime : option time, Date : option string} = json_record_withOptional {} {DateTime = "dateTime", Date = "date"}
 val _ : json internal_event = json_record_withOptional
                                   {Id = "id",
                                    Summary = "summary",
@@ -366,8 +375,25 @@ functor Calendar(M : S) = struct
         s <- api (bless "https://www.googleapis.com/calendar/v3/users/me/calendarList");
         return (fromJson s : calendarList).Items
 
+    fun when r =
+        case r.DateTime of
+            Some t => Time t
+          | None =>
+            case r.Date of
+                Some s =>
+                (case String.split s #"-" of
+                     None => error <xml>Invalid date string "{[s]}" in Google API response</xml>
+                   | Some (y, rest) =>
+                     case String.split rest #"-" of
+                         None => error <xml>Invalid date string "{[s]}" in Google API response</xml>
+                       | Some (m, d) =>
+                         case (read y, read m, read d) of
+                             (Some y, Some m, Some d) => Date {Year = y, Month = m, Day = d}
+                           | _ => error <xml>Invalid date string "{[s]}" in Google API response</xml>)
+              | None => error <xml>Google API response contains an empty time</xml>
+        
     fun events cid =
         s <- api (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events"));
-        return (List.mp (fn r => r -- #Start -- #End ++ {Start = r.Start.DateTime, End = r.End.DateTime})
+        return (List.mp (fn r => r -- #Start -- #End ++ {Start = when r.Start, End = when r.End})
                 (fromJson s : events).Items)
 end

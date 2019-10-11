@@ -82,12 +82,17 @@ type event_id
 val show_event_id : show event_id
 val eq_event_id : eq event_id
 
+datatype when =
+         Time of time
+       | Date of {Year : int, Month : int, Day : int}
+val show_when : show when
+                  
 type event = {
      Id : event_id,
      Summary : string,
      Description : option string,
-     Start : time,
-     End : time
+     Start : when,
+     End : when
 }
 
 functor Calendar(M : S) : sig
