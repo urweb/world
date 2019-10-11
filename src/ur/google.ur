@@ -275,7 +275,7 @@ type calendarList = {
      Items : list calendar
 }
 val _ : json calendarList = json_record {Items = "items"}
-                        
+
 functor Calendar(M : S) = struct
     open M
 
@@ -312,7 +312,7 @@ functor Calendar(M : S) = struct
                     end)
 
     val logout = clearCookie user
-                 
+
     val token =
         c <- getCookie user;
         case c of
