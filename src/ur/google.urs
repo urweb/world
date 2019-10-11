@@ -89,10 +89,10 @@ val show_when : show when
                   
 type event = {
      Id : event_id,
-     Summary : string,
+     Summary : option string,
      Description : option string,
-     Start : when,
-     End : when
+     Start : option when,
+     End : option when
 }
 
 functor Calendar(M : S) : sig

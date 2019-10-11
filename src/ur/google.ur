@@ -291,26 +291,26 @@ val show_when = mkShow (fn w =>
 
 type event = {
      Id : event_id,
-     Summary : string,
+     Summary : option string,
      Description : option string,
-     Start : when,
-     End : when
+     Start : option when,
+     End : option when
 }
 
 type internal_event = {
      Id : event_id,
-     Summary : string,
+     Summary : option string,
      Description : option string,
-     Start : {DateTime : option time, Date : option string},
-     End : {DateTime : option time, Date : option string}
+     Start : option {DateTime : option time, Date : option string},
+     End : option {DateTime : option time, Date : option string}
 }
 val _ : json {DateTime : option time, Date : option string} = json_record_withOptional {} {DateTime = "dateTime", Date = "date"}
 val _ : json internal_event = json_record_withOptional
-                                  {Id = "id",
-                                   Summary = "summary",
+                                  {Id = "id"}
+                                  {Summary = "summary",
+                                   Description = "description",
                                    Start = "start",
                                    End = "end"}
-                                  {Description = "description"}
 
 type events = {
      Items : list internal_event
@@ -394,6 +394,6 @@ functor Calendar(M : S) = struct
         
     fun events cid =
         s <- api (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events"));
-        return (List.mp (fn r => r -- #Start -- #End ++ {Start = when r.Start, End = when r.End})
+        return (List.mp (fn r => r -- #Start -- #End ++ {Start = Option.mp when r.Start, End = Option.mp when r.End})
                 (fromJson s : events).Items)
 end
