@@ -67,3 +67,20 @@ functor Gmail(M : S) : sig
 
     val ofThread : thread_id -> transaction url (* user-specific URL to a thread on Gmail *)
 end
+
+type calendar_id
+val show_calendar_id : show calendar_id
+val eq_calendar_id : eq calendar_id
+                       
+type calendar = {
+     Id : calendar_id,
+     Summary : string,
+     Description : option string
+}
+                       
+functor Calendar(M : S) : sig
+   val authorize : { ReturnTo : url } -> transaction page
+   val logout : transaction unit
+
+   val calendars : transaction (list calendar)
+end

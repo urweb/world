@@ -257,3 +257,80 @@ functor Gmail(M : S) = struct
         addr <- emailAddress;
         return (bless ("https://mail.google.com/mail?authuser=" ^ addr ^ "#all/" ^ tid))
 end
+
+type calendar_id = string
+val show_calendar_id = _
+val eq_calendar_id = _
+                       
+type calendar = {
+     Id : calendar_id,
+     Summary : string,
+     Description : option string
+}
+val _ : json calendar = json_record_withOptional {Id = "id",
+                                                  Summary = "summary"}
+                                                 {Description = "description"}
+
+type calendarList = {
+     Items : list calendar
+}
+val _ : json calendarList = json_record {Items = "items"}
+                        
+functor Calendar(M : S) = struct
+    open M
+
+    table secrets : { Secret : int,
+                      Token : string,
+                      Expires : time }
+      PRIMARY KEY Secret
+
+    task periodic 60 = fn () =>
+                          tm <- now;
+                          dml (DELETE FROM secrets
+                               WHERE Expires < {[addSeconds tm (-60)]})
+
+    cookie user : int
+
+    fun withToken {Token = tok, Expiration = seconds, ...} =
+        case seconds of
+            None => error <xml>Missing token expiration in OAuth response</xml>
+          | Some seconds =>
+            secret <- rand;
+            tm <- now;
+            dml (INSERT INTO secrets(Secret, Token, Expires)
+                 VALUES ({[secret]}, {[tok]}, {[addSeconds tm (seconds * 3 / 4)]}));
+            setCookie user {Value = secret,
+                            Expires = None,
+                            Secure = https}
+
+    open Oauth.Make(struct
+                        open M
+                        open OauthP
+
+                        val withToken = withToken
+                        val scope = Some "https://www.googleapis.com/auth/calendar.readonly"
+                    end)
+
+    val logout = clearCookie user
+                 
+    val token =
+        c <- getCookie user;
+        case c of
+            None => error <xml>You must be logged into Google to use this feature.</xml>
+          | Some n =>
+            tokopt <- oneOrNoRowsE1 (SELECT (secrets.Token)
+                                     FROM secrets
+                                     WHERE secrets.Secret = {[n]}
+                                       AND secrets.Expires > CURRENT_TIMESTAMP);
+            case tokopt of
+                None => error <xml>You must be logged into Google to use this feature.</xml>
+              | Some tok => return tok
+
+    fun api url =
+        tok <- token;
+        WorldFfi.get url (Some ("Bearer " ^ tok))
+
+    val calendars =
+        s <- api (bless "https://www.googleapis.com/calendar/v3/users/me/calendarList");
+        return (fromJson s : calendarList).Items
+end
