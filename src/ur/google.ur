@@ -276,6 +276,38 @@ type calendarList = {
 }
 val _ : json calendarList = json_record {Items = "items"}
 
+type event_id = string
+val show_event_id = _
+val eq_event_id = _
+
+type event = {
+     Id : event_id,
+     Summary : string,
+     Description : option string,
+     Start : time,
+     End : time
+}
+
+type internal_event = {
+     Id : event_id,
+     Summary : string,
+     Description : option string,
+     Start : {DateTime : time},
+     End : {DateTime : time}
+}
+val _ : json {DateTime : time} = json_record {DateTime = "dateTime"}
+val _ : json internal_event = json_record_withOptional
+                                  {Id = "id",
+                                   Summary = "summary",
+                                   Start = "start",
+                                   End = "end"}
+                                  {Description = "description"}
+
+type events = {
+     Items : list internal_event
+}
+val _ : json events = json_record {Items = "items"}
+                              
 functor Calendar(M : S) = struct
     open M
 
@@ -333,4 +365,9 @@ functor Calendar(M : S) = struct
     val calendars =
         s <- api (bless "https://www.googleapis.com/calendar/v3/users/me/calendarList");
         return (fromJson s : calendarList).Items
+
+    fun events cid =
+        s <- api (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events"));
+        return (List.mp (fn r => r -- #Start -- #End ++ {Start = r.Start.DateTime, End = r.End.DateTime})
+                (fromJson s : events).Items)
 end

@@ -77,10 +77,23 @@ type calendar = {
      Summary : string,
      Description : option string
 }
-                       
+
+type event_id
+val show_event_id : show event_id
+val eq_event_id : eq event_id
+
+type event = {
+     Id : event_id,
+     Summary : string,
+     Description : option string,
+     Start : time,
+     End : time
+}
+
 functor Calendar(M : S) : sig
    val authorize : { ReturnTo : url } -> transaction page
    val logout : transaction unit
 
    val calendars : transaction (list calendar)
+   val events : calendar_id -> transaction (list event)
 end
