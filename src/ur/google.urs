@@ -86,13 +86,32 @@ datatype when =
          Time of time
        | Date of {Year : int, Month : int, Day : int}
 val show_when : show when
-                  
+
+datatype responseStatus =
+         NeedsAction
+       | Declined
+       | Tentative
+       | Accepted
+
+type attendee = {
+     AdditionalGuests : option int,
+     Comment : option string,
+     DisplayName : option string,
+     Email : option string,
+     Optional : option bool,
+     Organizer : option bool,
+     Resource : option bool,
+     ResponseStatus : responseStatus,
+     Self : option bool
+}
+
 type event = {
      Id : event_id,
      Summary : option string,
      Description : option string,
      Start : option when,
-     End : option when
+     End : option when,
+     Attendees : option (list attendee)
 }
 
 functor Calendar(M : S) : sig

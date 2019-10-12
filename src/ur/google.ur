@@ -289,20 +289,62 @@ val show_when = mkShow (fn w =>
                                Time t => show t
                              | Date r => show r.Year ^ "/" ^ show r.Month ^ "/" ^ show r.Day)
 
+datatype responseStatus =
+         NeedsAction
+       | Declined
+       | Tentative
+       | Accepted
+
+type attendee = {
+     AdditionalGuests : option int,
+     Comment : option string,
+     DisplayName : option string,
+     Email : option string,
+     Optional : option bool,
+     Organizer : option bool,
+     Resource : option bool,
+     ResponseStatus : responseStatus,
+     Self : option bool
+}
+
 type event = {
      Id : event_id,
      Summary : option string,
      Description : option string,
      Start : option when,
-     End : option when
+     End : option when,
+     Attendees : option (list attendee)
 }
+
+type internal_attendee = {
+     AdditionalGuests : option int,
+     Comment : option string,
+     DisplayName : option string,
+     Email : option string,
+     Optional : option bool,
+     Organizer : option bool,
+     Resource : option bool,
+     ResponseStatus : string,
+     Self : option bool
+}
+val _ : json internal_attendee = json_record_withOptional
+                                     {ResponseStatus = "responseStatus"}
+                                     {AdditionalGuests = "additionalGuests",
+                                      Comment = "comment",
+                                      DisplayName = "displayName",
+                                      Email = "email",
+                                      Optional = "optional",
+                                      Organizer = "organizer",
+                                      Resource = "resource",
+                                      Self = "self"}
 
 type internal_event = {
      Id : event_id,
      Summary : option string,
      Description : option string,
      Start : option {DateTime : option time, Date : option string},
-     End : option {DateTime : option time, Date : option string}
+     End : option {DateTime : option time, Date : option string},
+     Attendees : option (list internal_attendee)
 }
 val _ : json {DateTime : option time, Date : option string} = json_record_withOptional {} {DateTime = "dateTime", Date = "date"}
 val _ : json internal_event = json_record_withOptional
@@ -310,7 +352,8 @@ val _ : json internal_event = json_record_withOptional
                                   {Summary = "summary",
                                    Description = "description",
                                    Start = "start",
-                                   End = "end"}
+                                   End = "end",
+                                   Attendees = "attendees"}
 
 type events = {
      Items : list internal_event
@@ -392,8 +435,22 @@ functor Calendar(M : S) = struct
                            | _ => error <xml>Invalid date string "{[s]}" in Google API response</xml>)
               | None => error <xml>Google API response contains an empty time</xml>
         
+    fun ingestAttendee a =
+        a -- #ResponseStatus
+          ++ {ResponseStatus = case a.ResponseStatus of
+                                   "needsAction" => NeedsAction
+                                 | "declined" => Declined
+                                 | "tentative" => Tentative
+                                 | "accepted" => Accepted
+                                 | s => error <xml>Bad Google Calendar response status "{[s]}"</xml>}
+
+    fun ingestEvent e =
+        e -- #Start -- #End -- #Attendees
+          ++ {Start = Option.mp when e.Start,
+              End = Option.mp when e.End,
+              Attendees = Option.mp (List.mp ingestAttendee) e.Attendees}
+
     fun events cid =
         s <- api (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events"));
-        return (List.mp (fn r => r -- #Start -- #End ++ {Start = Option.mp when r.Start, End = Option.mp when r.End})
-                (fromJson s : events).Items)
+        return (List.mp ingestEvent (fromJson s : events).Items)
 end
