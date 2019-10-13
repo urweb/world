@@ -129,8 +129,14 @@ functor Calendar(M : sig
    val authorize : { ReturnTo : url } -> transaction page
    val logout : transaction unit
 
-   val calendars : transaction (list calendar)
-   val events : calendar_id -> transaction (list event)
-   val insertEvent : calendar_id -> newEvent -> transaction event
-   val updateEvent : calendar_id -> event -> transaction event
+   structure Calendars : sig
+       val list : transaction (list calendar)
+   end
+
+   structure Events : sig
+       val list : calendar_id -> transaction (list event)
+       val insert : calendar_id -> newEvent -> transaction event
+       val update : calendar_id -> event -> transaction event
+       val delete : calendar_id -> event_id -> transaction unit
+   end
 end

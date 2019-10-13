@@ -449,9 +449,15 @@ functor Calendar(M : sig
         tok <- token;
         WorldFfi.put url (Some ("Bearer " ^ tok)) (Some "application/json") body
 
-    val calendars =
-        s <- api (bless "https://www.googleapis.com/calendar/v3/users/me/calendarList");
-        return (fromJson s : calendarList).Items
+    fun apiDelete url =
+        tok <- token;
+        WorldFfi.delete url (Some ("Bearer " ^ tok))
+
+    structure Calendars = struct
+        val list =
+            s <- api (bless "https://www.googleapis.com/calendar/v3/users/me/calendarList");
+            return (fromJson s : calendarList).Items
+    end
 
     fun ingestWhen r =
         case r.DateTime of
@@ -516,21 +522,29 @@ functor Calendar(M : sig
               End = Option.mp excreteWhen e.End,
               Attendees = Option.mp (List.mp excreteAttendee) e.Attendees}
 
-    fun events cid =
-        s <- api (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events"));
-        return (List.mp ingestEvent (fromJson s : events).Items)
+    structure Events = struct
+        fun list cid =
+            s <- api (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events"));
+            return (List.mp ingestEvent (fromJson s : events).Items)
 
-    fun insertEvent cid e =
-        if readonly then
-            error <xml>Google Calendar: attempt to <tt>insertEvent</tt> in read-only mode</xml>
-        else
-            s <- apiPost (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events")) (toJson (excreteEvent e));
-            return (ingestEvent (fromJson s))
+        fun insert cid e =
+            if readonly then
+                error <xml>Google Calendar: attempt to <tt>Events.insert</tt> in read-only mode</xml>
+            else
+                s <- apiPost (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events")) (toJson (excreteEvent e));
+                return (ingestEvent (fromJson s))
 
-    fun updateEvent cid e =
-        if readonly then
-            error <xml>Google Calendar: attempt to <tt>updateEvent</tt> in read-only mode</xml>
-        else
-            s <- apiPut (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events/" ^ e.Id)) (toJson (excreteEvent (e -- #Id)));
-            return (ingestEvent (fromJson s))
+        fun update cid e =
+            if readonly then
+                error <xml>Google Calendar: attempt to <tt>Events.update</tt> in read-only mode</xml>
+            else
+                s <- apiPut (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events/" ^ e.Id)) (toJson (excreteEvent (e -- #Id)));
+                return (ingestEvent (fromJson s))
+
+        fun delete cid eid =
+            if readonly then
+                error <xml>Google Calendar: attempt to <tt>Events.delete</tt> in read-only mode</xml>
+            else
+                Monad.ignore (apiDelete (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events/" ^ eid)))
+    end
 end
