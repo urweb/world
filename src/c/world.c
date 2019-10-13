@@ -90,7 +90,7 @@ static uw_Basis_string doweb(uw_context ctx, CURL *c, uw_Basis_string url, int e
   return ret;
 }
 
-uw_Basis_string uw_WorldFfi_post(uw_context ctx, uw_Basis_string url, uw_Basis_string body) {
+static uw_Basis_string nonget(int isPut, uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_string bodyContentType, uw_Basis_string body) {
   uw_Basis_string lastUrl = uw_get_global(ctx, "world.lastUrl");
   if (lastUrl && !strcmp(lastUrl, url)) {
       uw_Basis_string lastBody = uw_get_global(ctx, "world.lastBody");
@@ -106,12 +106,42 @@ uw_Basis_string uw_WorldFfi_post(uw_context ctx, uw_Basis_string url, uw_Basis_s
 
   curl_easy_reset(c);
   curl_easy_setopt(c, CURLOPT_POSTFIELDS, body);
+  if (isPut)
+    curl_easy_setopt(c, CURLOPT_CUSTOMREQUEST, "PUT");
 
-  uw_Basis_string ret = doweb(ctx, c, url, 1);
+  struct curl_slist *slist = NULL;
+  slist = curl_slist_append(slist, "User-Agent: Ur/Web World library");
+
+  if (auth) {
+    uw_Basis_string header = uw_Basis_strcat(ctx, "Authorization: ", auth);
+    slist = curl_slist_append(slist, header);
+  }
+
+  if (bodyContentType) {
+    uw_Basis_string header = uw_Basis_strcat(ctx, "Content-Type: ", bodyContentType);
+    slist = curl_slist_append(slist, header);
+  }
+
+  if (slist == NULL)
+    uw_error(ctx, FATAL, "Can't append to libcurl slist");
+
+  curl_easy_setopt(c, CURLOPT_HTTPHEADER, slist);
+  uw_push_cleanup(ctx, (void (*)(void *))curl_slist_free_all, slist);
+
+  uw_Basis_string ret = doweb(ctx, c, url, 0);
   uw_set_global(ctx, "world.lastUrl", strdup(url), free);
   uw_set_global(ctx, "world.lastBody", strdup(body), free);
   uw_set_global(ctx, "world.lastResponse", strdup(ret), free);
+  uw_pop_cleanup(ctx);
   return ret;
+}
+
+uw_Basis_string uw_WorldFfi_post(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_string bodyContentType, uw_Basis_string body) {
+  return nonget(0, ctx, url, auth, bodyContentType, body);
+}
+
+uw_Basis_string uw_WorldFfi_put(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_string bodyContentType, uw_Basis_string body) {
+  return nonget(1, ctx, url, auth, bodyContentType, body);
 }
 
 uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_string auth) {

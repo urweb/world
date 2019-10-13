@@ -1,2 +1,3 @@
-val post : url -> string -> transaction string
-val get : url -> option string -> transaction string
+val get : url -> option string (* auth header *) -> transaction string
+val post : url -> option string (* auth header *) -> option string (* body Content-type *) -> string (* body *) -> transaction string
+val put : url -> option string (* auth header *) -> option string (* body Content-type *) -> string (* body *) -> transaction string

@@ -355,12 +355,38 @@ val _ : json internal_event = json_record_withOptional
                                    End = "end",
                                    Attendees = "attendees"}
 
+type internal_newEvent = {
+     Summary : option string,
+     Description : option string,
+     Start : option {DateTime : option time, Date : option string},
+     End : option {DateTime : option time, Date : option string},
+     Attendees : option (list internal_attendee)
+}
+val _ : json internal_newEvent = json_record_withOptional
+                                     {}
+                                     {Summary = "summary",
+                                      Description = "description",
+                                      Start = "start",
+                                      End = "end",
+                                      Attendees = "attendees"}
+
 type events = {
      Items : list internal_event
 }
 val _ : json events = json_record {Items = "items"}
-                              
-functor Calendar(M : S) = struct
+
+type newEvent = {
+     Summary : option string,
+     Description : option string,
+     Start : option when,
+     End : option when,
+     Attendees : option (list attendee)
+}
+
+functor Calendar(M : sig
+                     include S
+                     val readonly : bool
+                 end) = struct
     open M
 
     table secrets : { Secret : int,
@@ -392,7 +418,8 @@ functor Calendar(M : S) = struct
                         open OauthP
 
                         val withToken = withToken
-                        val scope = Some "https://www.googleapis.com/auth/calendar.readonly"
+                        val scope = Some ("https://www.googleapis.com/auth/calendar"
+                                          ^ if readonly then ".readonly" else "")
                     end)
 
     val logout = clearCookie user
@@ -414,11 +441,19 @@ functor Calendar(M : S) = struct
         tok <- token;
         WorldFfi.get url (Some ("Bearer " ^ tok))
 
+    fun apiPost url body =
+        tok <- token;
+        WorldFfi.post url (Some ("Bearer " ^ tok)) (Some "application/json") body
+
+    fun apiPut url body =
+        tok <- token;
+        WorldFfi.put url (Some ("Bearer " ^ tok)) (Some "application/json") body
+
     val calendars =
         s <- api (bless "https://www.googleapis.com/calendar/v3/users/me/calendarList");
         return (fromJson s : calendarList).Items
 
-    fun when r =
+    fun ingestWhen r =
         case r.DateTime of
             Some t => Time t
           | None =>
@@ -446,11 +481,56 @@ functor Calendar(M : S) = struct
 
     fun ingestEvent e =
         e -- #Start -- #End -- #Attendees
-          ++ {Start = Option.mp when e.Start,
-              End = Option.mp when e.End,
+          ++ {Start = Option.mp ingestWhen e.Start,
+              End = Option.mp ingestWhen e.End,
               Attendees = Option.mp (List.mp ingestAttendee) e.Attendees}
+
+    fun paddedInt padding n =
+        let
+            val s = show n
+            fun zeroes n =
+                if n <= 0 then
+                    ""
+                else
+                    "0" ^ zeroes (n - 1)
+        in
+            zeroes (padding - String.length s) ^ s
+        end
+
+    fun excreteWhen w =
+        case w of
+            Time t => {DateTime = Some t, Date = None}
+          | Date r => {DateTime = None, Date = Some (paddedInt 4 r.Year ^ "-" ^ paddedInt 2 r.Month ^ "-" ^ paddedInt 2 r.Day)}
+
+    fun excreteAttendee a =
+        a -- #ResponseStatus
+          ++ {ResponseStatus = case a.ResponseStatus of
+                                   NeedsAction => "needsAction"
+                                 | Declined => "declined"
+                                 | Tentative => "tentative"
+                                 | Accepted => "accepted"}
+
+    fun excreteEvent e =
+        e -- #Start -- #End -- #Attendees
+          ++ {Start = Option.mp excreteWhen e.Start,
+              End = Option.mp excreteWhen e.End,
+              Attendees = Option.mp (List.mp excreteAttendee) e.Attendees}
 
     fun events cid =
         s <- api (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events"));
         return (List.mp ingestEvent (fromJson s : events).Items)
+
+    fun insertEvent cid e =
+        if readonly then
+            error <xml>Google Calendar: attempt to <tt>insertEvent</tt> in read-only mode</xml>
+        else
+            s <- apiPost (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events")) (toJson (excreteEvent e));
+            return (ingestEvent (fromJson s))
+
+    fun updateEvent cid e =
+        if readonly then
+            error <xml>Google Calendar: attempt to <tt>updateEvent</tt> in read-only mode</xml>
+        else
+            s <- apiPut (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events/" ^ e.Id)) (toJson (excreteEvent (e -- #Id)));
+            return (ingestEvent (fromJson s))
 end

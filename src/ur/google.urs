@@ -114,10 +114,23 @@ type event = {
      Attendees : option (list attendee)
 }
 
-functor Calendar(M : S) : sig
+type newEvent = {
+     Summary : option string,
+     Description : option string,
+     Start : option when,
+     End : option when,
+     Attendees : option (list attendee)
+}
+
+functor Calendar(M : sig
+                     include S
+                     val readonly : bool
+                 end) : sig
    val authorize : { ReturnTo : url } -> transaction page
    val logout : transaction unit
 
    val calendars : transaction (list calendar)
    val events : calendar_id -> transaction (list event)
+   val insertEvent : calendar_id -> newEvent -> transaction event
+   val updateEvent : calendar_id -> event -> transaction event
 end
