@@ -260,6 +260,7 @@ end
 
 type calendar_id = string
 val show_calendar_id = _
+val read_calendar_id = _
 val eq_calendar_id = _
                        
 type calendar = {
@@ -422,6 +423,18 @@ functor Calendar(M : sig
                                           ^ if readonly then ".readonly" else "")
                     end)
 
+    val loggedIn = c <- getCookie user;
+        case c of
+            None => return False
+          | Some s =>
+            expiresO <- oneOrNoRowsE1 (SELECT (secrets.Expires)
+                                       FROM secrets
+                                       WHERE secrets.Secret = {[s]});
+            case expiresO of
+                None => return False
+              | Some exp =>
+                tm <- now;
+                return (tm < exp)
     val logout = clearCookie user
 
     val token =
@@ -523,8 +536,15 @@ functor Calendar(M : sig
               Attendees = Option.mp (List.mp excreteAttendee) e.Attendees}
 
     structure Events = struct
-        fun list cid =
-            s <- api (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events"));
+        fun list cid bounds =
+            url <- return ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events");
+            url <- return (case bounds.Min of
+                               None => url
+                             | Some min => url ^ "?timeMin=" ^ rfc3339_out min);
+            url <- return (case bounds.Max of
+                               None => url
+                             | Some max => url ^ (if Option.isNone bounds.Min then "?" else "&") ^ "timeMax=" ^ rfc3339_out max);
+            s <- api (bless url);
             return (List.mp ingestEvent (fromJson s : events).Items)
 
         fun insert cid e =

@@ -70,6 +70,7 @@ end
 
 type calendar_id
 val show_calendar_id : show calendar_id
+val read_calendar_id : read calendar_id
 val eq_calendar_id : eq calendar_id
                        
 type calendar = {
@@ -126,17 +127,18 @@ functor Calendar(M : sig
                      include S
                      val readonly : bool
                  end) : sig
-   val authorize : { ReturnTo : url } -> transaction page
-   val logout : transaction unit
+    val authorize : { ReturnTo : url } -> transaction page
+    val loggedIn : transaction bool
+    val logout : transaction unit
 
-   structure Calendars : sig
+    structure Calendars : sig
        val list : transaction (list calendar)
-   end
+    end
 
-   structure Events : sig
-       val list : calendar_id -> transaction (list event)
-       val insert : calendar_id -> newEvent -> transaction event
-       val update : calendar_id -> event -> transaction event
-       val delete : calendar_id -> event_id -> transaction unit
-   end
+    structure Events : sig
+        val list : calendar_id -> {Min : option time, Max : option time} -> transaction (list event)
+        val insert : calendar_id -> newEvent -> transaction event
+        val update : calendar_id -> event -> transaction event
+        val delete : calendar_id -> event_id -> transaction unit
+    end
 end
