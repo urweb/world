@@ -384,6 +384,16 @@ type newEvent = {
      Attendees : option (list attendee)
 }
 
+datatype updatesMode =
+         All
+       | ExternalOnly
+       | NoneUpdates
+val _ = mkShow (fn m =>
+                   case m of
+                       All => "all"
+                     | ExternalOnly => "externalOnly"
+                     | NoneUpdates => "none")
+
 functor Calendar(M : sig
                      include S
                      val readonly : bool
@@ -547,11 +557,15 @@ functor Calendar(M : sig
             s <- api (bless url);
             return (List.mp ingestEvent (fromJson s : events).Items)
 
-        fun insert cid e =
+        fun insert cid flags e =
             if readonly then
                 error <xml>Google Calendar: attempt to <tt>Events.insert</tt> in read-only mode</xml>
             else
-                s <- apiPost (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events")) (toJson (excreteEvent e));
+                url <- return ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events");
+                url <- return (case flags.SendUpdates of
+                                   None => url
+                                 | Some m => url ^ "?sendUpdates=" ^ show m);
+                s <- apiPost (bless url) (toJson (excreteEvent e));
                 return (ingestEvent (fromJson s))
 
         fun update cid e =

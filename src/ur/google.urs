@@ -123,6 +123,11 @@ type newEvent = {
      Attendees : option (list attendee)
 }
 
+datatype updatesMode =
+         All
+       | ExternalOnly
+       | NoneUpdates
+                
 functor Calendar(M : sig
                      include S
                      val readonly : bool
@@ -137,7 +142,7 @@ functor Calendar(M : sig
 
     structure Events : sig
         val list : calendar_id -> {Min : option time, Max : option time} -> transaction (list event)
-        val insert : calendar_id -> newEvent -> transaction event
+        val insert : calendar_id -> {SendUpdates : option updatesMode} -> newEvent -> transaction event
         val update : calendar_id -> event -> transaction event
         val delete : calendar_id -> event_id -> transaction unit
     end
