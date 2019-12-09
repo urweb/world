@@ -4,6 +4,11 @@
 
 #include <curl/curl.h>
 
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+#include <openssl/rsa.h>
+#include <openssl/pem.h>
+
 #include <urweb.h>
 #include <world.h>
 
@@ -178,4 +183,53 @@ uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_st
   uw_pop_cleanup(ctx);
 
   return ret;
+}
+
+uw_Basis_int uw_WorldFfi_length(uw_context ctx, uw_WorldFfi_signatur sig) {
+  return sig.len;
+}
+uw_Basis_char uw_WorldFfi_byte(uw_context ctx, uw_WorldFfi_signatur sig, uw_Basis_int i) {
+  if (i < 0 || i >= sig.len)
+    uw_error(ctx, FATAL, "Referenced out-of-bounds %d in signature.", i);
+  return sig.bytes[i];
+}
+
+uw_WorldFfi_signatur uw_WorldFfi_sign(uw_context ctx, uw_Basis_string key, uw_Basis_string message) {
+  unsigned char digest[SHA256_DIGEST_LENGTH];
+  uw_WorldFfi_signatur sig;
+
+  if (!SHA256((const unsigned char *)message, strlen(message), digest))
+    uw_error(ctx, FATAL, "World: SHA256 failed");
+
+  BIO *bo = BIO_new(BIO_s_mem());
+  if (BIO_write(bo, key, strlen(key)) <= 0) {
+    BIO_free(bo);
+    uw_error(ctx, FATAL, "World: BIO_write failed");
+  }
+
+  EVP_PKEY *pkey = 0;
+  if (!PEM_read_bio_PrivateKey(bo, &pkey, 0, 0)) {
+    BIO_free(bo);
+    uw_error(ctx, FATAL, "World: PEM_read_bio_PrivateKey failed");
+  }
+
+  BIO_free(bo);
+
+  RSA *rsa;
+  if (!(rsa = EVP_PKEY_get1_RSA(pkey))) {
+    EVP_PKEY_free(pkey);
+    uw_error(ctx, FATAL, "World: EVP_PKEY_get1_RSA failed");
+  }
+
+  EVP_PKEY_free(pkey);
+
+  sig.bytes = uw_malloc(ctx, RSA_size(rsa));
+  if (RSA_sign(NID_sha256, digest, sizeof digest,
+               (unsigned char *)sig.bytes, (unsigned int *)&sig.len, rsa) != 1) {
+    RSA_free(rsa);
+    uw_error(ctx, FATAL, "World: RSA_sign failed");
+  }
+
+  RSA_free(rsa);
+  return sig;
 }

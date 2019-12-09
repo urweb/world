@@ -4,6 +4,12 @@ signature S = sig
     val https : bool
 end
 
+signature SS = sig
+    val service_account : string
+    val private_key : string
+    val https : bool
+end
+
 (* First service: merely verifying which Google user we are dealing with *)
 functor Login(M : S) : sig
     val authorize : { ReturnTo : url } -> transaction page
@@ -127,15 +133,8 @@ datatype updatesMode =
          All
        | ExternalOnly
        | NoneUpdates
-                
-functor Calendar(M : sig
-                     include S
-                     val readonly : bool
-                 end) : sig
-    val authorize : { ReturnTo : url } -> transaction page
-    val loggedIn : transaction bool
-    val logout : transaction unit
 
+signature CALENDAR = sig
     structure Calendars : sig
        val list : transaction (list calendar)
     end
@@ -146,4 +145,22 @@ functor Calendar(M : sig
         val update : calendar_id -> event -> transaction event
         val delete : calendar_id -> event_id -> transaction unit
     end
+end
+
+functor CalendarThreeLegged(M : sig
+                                include S
+                                val readonly : bool
+                            end) : sig
+    include CALENDAR
+
+    val authorize : { ReturnTo : url } -> transaction page
+    val loggedIn : transaction bool
+    val logout : transaction unit
+end
+
+functor CalendarTwoLegged(M : sig
+                              include SS
+                              val readonly : bool
+                          end) : sig
+    include CALENDAR
 end

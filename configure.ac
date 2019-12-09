@@ -6,6 +6,8 @@ AM_PROG_AR()
 AC_PROG_LIBTOOL()
 AC_CONFIG_MACRO_DIR([m4])
 
+AX_CHECK_OPENSSL([echo >/dev/null], [echo "You must install OpenSSL development files."; exit 1])
+
 LIBCURL_CHECK_CONFIG(yes, [], [echo >/dev/null], [echo "You must install libcurl development files."; exit 1])
 
 if test [$prefix = "NONE"]; then

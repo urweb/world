@@ -6,6 +6,12 @@ signature S = sig
     val https : bool
 end
 
+signature SS = sig
+    val service_account : string
+    val private_key : string
+    val https : bool
+end
+
 type profile = { ResourceName : string }
 
 val json_profile : json profile =
@@ -394,71 +400,24 @@ val _ = mkShow (fn m =>
                      | ExternalOnly => "externalOnly"
                      | NoneUpdates => "none")
 
+signature CALENDAR = sig
+    structure Calendars : sig
+       val list : transaction (list calendar)
+    end
+
+    structure Events : sig
+        val list : calendar_id -> {Min : option time, Max : option time} -> transaction (list event)
+        val insert : calendar_id -> {SendUpdates : option updatesMode} -> newEvent -> transaction event
+        val update : calendar_id -> event -> transaction event
+        val delete : calendar_id -> event_id -> transaction unit
+    end
+end
+
 functor Calendar(M : sig
-                     include S
                      val readonly : bool
+                     val token : transaction string
                  end) = struct
     open M
-
-    table secrets : { Secret : int,
-                      Token : string,
-                      Expires : time }
-      PRIMARY KEY Secret
-
-    task periodic 60 = fn () =>
-                          tm <- now;
-                          dml (DELETE FROM secrets
-                               WHERE Expires < {[addSeconds tm (-60)]})
-
-    cookie user : int
-
-    fun withToken {Token = tok, Expiration = seconds, ...} =
-        case seconds of
-            None => error <xml>Missing token expiration in OAuth response</xml>
-          | Some seconds =>
-            secret <- rand;
-            tm <- now;
-            dml (INSERT INTO secrets(Secret, Token, Expires)
-                 VALUES ({[secret]}, {[tok]}, {[addSeconds tm (seconds * 3 / 4)]}));
-            setCookie user {Value = secret,
-                            Expires = None,
-                            Secure = https}
-
-    open Oauth.Make(struct
-                        open M
-                        open OauthP
-
-                        val withToken = withToken
-                        val scope = Some ("https://www.googleapis.com/auth/calendar"
-                                          ^ if readonly then ".readonly" else "")
-                    end)
-
-    val loggedIn = c <- getCookie user;
-        case c of
-            None => return False
-          | Some s =>
-            expiresO <- oneOrNoRowsE1 (SELECT (secrets.Expires)
-                                       FROM secrets
-                                       WHERE secrets.Secret = {[s]});
-            case expiresO of
-                None => return False
-              | Some exp =>
-                tm <- now;
-                return (tm < exp)
-    val logout = clearCookie user
-
-    val token =
-        c <- getCookie user;
-        case c of
-            None => error <xml>You must be logged into Google to use this feature.</xml>
-          | Some n =>
-            tokopt <- oneOrNoRowsE1 (SELECT (secrets.Token)
-                                     FROM secrets
-                                     WHERE secrets.Secret = {[n]}
-                                       AND secrets.Expires > CURRENT_TIMESTAMP);
-            case tokopt of
-                None => error <xml>You must be logged into Google to use this feature.</xml>
-              | Some tok => return tok
 
     fun api url =
         tok <- token;
@@ -581,4 +540,224 @@ functor Calendar(M : sig
             else
                 Monad.ignore (apiDelete (bless ("https://www.googleapis.com/calendar/v3/calendars/" ^ cid ^ "/events/" ^ eid)))
     end
+end
+
+functor CalendarThreeLegged(M : sig
+                                include S
+                                val readonly : bool
+                            end) = struct
+    open M
+
+    table secrets : { Secret : int,
+                      Token : string,
+                      Expires : time }
+      PRIMARY KEY Secret
+
+    task periodic 60 = fn () =>
+                          tm <- now;
+                          dml (DELETE FROM secrets
+                               WHERE Expires < {[addSeconds tm (-60)]})
+
+    cookie user : int
+
+    fun withToken {Token = tok, Expiration = seconds, ...} =
+        case seconds of
+            None => error <xml>Missing token expiration in OAuth response</xml>
+          | Some seconds =>
+            secret <- rand;
+            tm <- now;
+            dml (INSERT INTO secrets(Secret, Token, Expires)
+                 VALUES ({[secret]}, {[tok]}, {[addSeconds tm (seconds * 3 / 4)]}));
+            setCookie user {Value = secret,
+                            Expires = None,
+                            Secure = https}
+
+    open Oauth.Make(struct
+                        open M
+                        open OauthP
+
+                        val withToken = withToken
+                        val scope = Some ("https://www.googleapis.com/auth/calendar"
+                                          ^ if readonly then ".readonly" else "")
+                    end)
+
+    val loggedIn = c <- getCookie user;
+        case c of
+            None => return False
+          | Some s =>
+            expiresO <- oneOrNoRowsE1 (SELECT (secrets.Expires)
+                                       FROM secrets
+                                       WHERE secrets.Secret = {[s]});
+            case expiresO of
+                None => return False
+              | Some exp =>
+                tm <- now;
+                return (tm < exp)
+    val logout = clearCookie user
+
+    val token =
+        c <- getCookie user;
+        case c of
+            None => error <xml>You must be logged into Google to use this feature.</xml>
+          | Some n =>
+            tokopt <- oneOrNoRowsE1 (SELECT (secrets.Token)
+                                     FROM secrets
+                                     WHERE secrets.Secret = {[n]}
+                                       AND secrets.Expires > CURRENT_TIMESTAMP);
+            case tokopt of
+                None => error <xml>You must be logged into Google to use this feature.</xml>
+              | Some tok => return tok
+
+    open Calendar(struct
+                      val readonly = readonly
+                      val token = token
+                  end)
+end
+
+fun base64url_encode' (getChar : int -> char) (len : int) =
+    let
+        fun char n =
+            String.str (Char.fromInt (if n < 0 then
+                                          error <xml>Negative character to base64 encode</xml>
+                                      else if n < 26 then
+                                          Char.toInt #"A" + n
+                                      else if n < 52 then
+                                          Char.toInt #"a" + (n - 26)
+                                      else if n < 62 then
+                                          Char.toInt #"0" + (n - 52)
+                                      else if n = 62 then
+                                          Char.toInt #"-"
+                                      else if n = 63 then
+                                          Char.toInt #"_"
+                                      else
+                                          error <xml>Invalid base64 digit</xml>))
+
+        fun ch j =
+            let
+                val n = Char.toInt (getChar j)
+            in
+                if n < 0 then
+                    n + 256
+                else
+                    n
+            end
+
+        fun bytes i acc =
+            if i >= len then
+                acc
+            else if i = len - 1 then
+                let
+                    val n = ch i * 16
+                in
+                    acc
+                    ^ char (n / 64)
+                    ^ char (n % 64)
+                    ^ "=="
+                end
+            else if i = len - 2 then
+                let
+                    val n1 = ch i
+                    val n2 = ch (i + 1)
+                    val n = n1 * (256 * 4) + n2 * 4
+                in
+                    acc
+                    ^ char (n / (64 * 64))
+                    ^ char (n / 64 % 64)
+                    ^ char (n % 64)
+                    ^ "="
+                end
+            else
+                let
+                    val n1 = ch i
+                    val n2 = ch (i + 1)
+                    val n3 = ch (i + 2)
+                    val n = n1 * (256 * 256) + n2 * 256 + n3
+                in
+                    bytes (i + 3) (acc
+                                   ^ char (n / (64 * 64 * 64))
+                                   ^ char (n / (64 * 64) % 64)
+                                   ^ char (n / 64 % 64)
+                                   ^ char (n % 64))
+                end
+    in
+        bytes 0 ""
+    end
+
+fun base64url_encode s = base64url_encode' (String.sub s) (String.length s)
+fun base64url_encode_signature s = base64url_encode' (WorldFfi.byte s) (WorldFfi.length s)
+
+type jwt_header = {
+     Alg : string,
+     Typ : string
+}
+val _ : json jwt_header = json_record {Alg = "alg",
+                                       Typ = "typ"}
+val jwt_header = {Alg = "RS256",
+                  Typ = "JWT"}
+
+type jwt_claim_set = {
+     Iss : string,
+     Scope : string,
+     Aud : string,
+     Exp : int,
+     Iat : int
+}
+val _ : json jwt_claim_set = json_record {Iss = "iss",
+                                          Scope = "scope",
+                                          Aud = "aud",
+                                          Exp = "exp",
+                                          Iat = "iat"}
+
+type jwt_response = {
+     AccessToken : string,
+     ExpiresIn : int
+}
+val _ : json jwt_response = json_record {AccessToken = "access_token",
+                                         ExpiresIn = "expires_in"}
+
+functor CalendarTwoLegged(M : sig
+                              include SS
+                              val readonly : bool
+                          end) = struct
+    open M
+
+    table mytoken : { Token : string,
+                      Expires : time }
+
+    task periodic 60 = fn () =>
+                          tm <- now;
+                          dml (DELETE FROM mytoken
+                               WHERE Expires < {[addSeconds tm (-60)]})
+
+    val token =
+        tokopt <- oneOrNoRowsE1 (SELECT (mytoken.Token)
+                                 FROM mytoken
+                                 WHERE mytoken.Expires > CURRENT_TIMESTAMP);
+        case tokopt of
+            Some tok => return tok
+          | None =>
+            tm <- now;
+            header <- return (toJson jwt_header);
+            clset <- return (toJson {Iss = service_account,
+                                     Scope = "https://www.googleapis.com/auth/calendar"
+                                             ^ (if readonly then ".readonly" else ""),
+                                     Aud = "https://oauth2.googleapis.com/token",
+                                     Exp = toSeconds (addSeconds tm (60 * 60)),
+                                     Iat = toSeconds tm});
+            header_clset <- return (base64url_encode header ^ "." ^ base64url_encode clset);
+            signed <- return (WorldFfi.sign private_key header_clset);
+            assertion <- return (header_clset ^ "." ^ base64url_encode_signature signed);
+            resp <- WorldFfi.post (bless "https://oauth2.googleapis.com/token") None
+                                  (Some "application/x-www-form-urlencoded")
+                                  ("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=" ^ assertion);
+            resp <- return (fromJson resp : jwt_response);
+            dml (DELETE FROM mytoken WHERE TRUE);
+            dml (INSERT INTO mytoken(Token, Expires)
+                 VALUES ({[resp.AccessToken]}, {[addSeconds tm resp.ExpiresIn]}));
+            return resp.AccessToken
+
+    open Calendar(struct
+                      val readonly = readonly
+                      val token = token
+                  end)
 end
