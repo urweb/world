@@ -9,6 +9,7 @@ end
 signature SS = sig
     val service_account : string
     val private_key : string
+    val impersonated_user : string
     val https : bool
 end
 
@@ -697,12 +698,14 @@ val jwt_header = {Alg = "RS256",
 
 type jwt_claim_set = {
      Iss : string,
+     Sub : string,
      Scope : string,
      Aud : string,
      Exp : int,
      Iat : int
 }
 val _ : json jwt_claim_set = json_record {Iss = "iss",
+                                          Sub = "sub",
                                           Scope = "scope",
                                           Aud = "aud",
                                           Exp = "exp",
@@ -739,6 +742,7 @@ functor CalendarTwoLegged(M : sig
             tm <- now;
             header <- return (toJson jwt_header);
             clset <- return (toJson {Iss = service_account,
+                                     Sub = impersonated_user,
                                      Scope = "https://www.googleapis.com/auth/calendar"
                                              ^ (if readonly then ".readonly" else ""),
                                      Aud = "https://oauth2.googleapis.com/token",

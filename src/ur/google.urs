@@ -7,6 +7,7 @@ end
 signature SS = sig
     val service_account : string
     val private_key : string
+    val impersonated_user : string
     val https : bool
 end
 
@@ -158,6 +159,11 @@ functor CalendarThreeLegged(M : sig
     val logout : transaction unit
 end
 
+(* SUPER-COUNTERINTUITIVE FACT TO REMEMBER: to make domain-wide delegation work
+ * properly (as is needed for two-legged authentication with impersonation), the
+ * service account must be granted use of the scope
+ * https://www.googleapis.com/auth/admin.directory.resource.calendar , not just
+ * whatever scopes you would use for normal calendar access! *)
 functor CalendarTwoLegged(M : sig
                               include SS
                               val readonly : bool
