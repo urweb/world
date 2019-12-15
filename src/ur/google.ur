@@ -401,25 +401,20 @@ val _ = mkShow (fn m =>
                      | ExternalOnly => "externalOnly"
                      | NoneUpdates => "none")
 
-signature CALENDAR = sig
-    structure Calendars : sig
-       val list : transaction (list calendar)
-    end
-
-    structure Events : sig
-        val list : calendar_id -> {Min : option time, Max : option time} -> transaction (list event)
-        val insert : calendar_id -> {SendUpdates : option updatesMode} -> newEvent -> transaction event
-        val update : calendar_id -> event -> transaction event
-        val delete : calendar_id -> event_id -> transaction unit
-    end
+signature CALENDAR_AUTH = sig
+    val readonly : bool
+    val token : transaction (option string)
 end
 
-functor Calendar(M : sig
-                     val readonly : bool
-                     val token : transaction string
-                 end) = struct
+functor Calendar(M : CALENDAR_AUTH) = struct
     open M
 
+    val token =
+        toko <- token;
+        case toko of
+            None => error <xml>You must be logged into Google Calendar to use this feature.</xml>
+          | Some tok => return tok
+         
     fun api url =
         tok <- token;
         WorldFfi.get url (Some ("Bearer " ^ tok))
@@ -599,20 +594,26 @@ functor CalendarThreeLegged(M : sig
     val token =
         c <- getCookie user;
         case c of
-            None => error <xml>You must be logged into Google to use this feature.</xml>
+            None => return None
           | Some n =>
-            tokopt <- oneOrNoRowsE1 (SELECT (secrets.Token)
-                                     FROM secrets
-                                     WHERE secrets.Secret = {[n]}
-                                       AND secrets.Expires > CURRENT_TIMESTAMP);
-            case tokopt of
-                None => error <xml>You must be logged into Google to use this feature.</xml>
-              | Some tok => return tok
+            oneOrNoRowsE1 (SELECT (secrets.Token)
+                           FROM secrets
+                           WHERE secrets.Secret = {[n]}
+                             AND secrets.Expires > CURRENT_TIMESTAMP)
 
-    open Calendar(struct
-                      val readonly = readonly
-                      val token = token
-                  end)
+    val status =
+        li <- loggedIn;
+        li <- source li;
+        cur <- currentUrl;
+        return <xml>
+          <dyn signal={liV <- signal li;
+                       if liV then
+                           return <xml><button value="Log out of Google Calendar"
+                                               onclick={fn _ => rpc logout; set li False}/></xml>
+                       else
+                           return <xml><button value="Log into Google Calendar"
+                                               onclick={fn _ => redirect (url (authorize {ReturnTo = cur}))}/></xml>}/>
+        </xml>
 end
 
 fun base64url_encode' (getChar : int -> char) (len : int) =
@@ -737,7 +738,7 @@ functor CalendarTwoLegged(M : sig
                                  FROM mytoken
                                  WHERE mytoken.Expires > CURRENT_TIMESTAMP);
         case tokopt of
-            Some tok => return tok
+            Some tok => return (Some tok)
           | None =>
             tm <- now;
             header <- return (toJson jwt_header);
@@ -758,10 +759,5 @@ functor CalendarTwoLegged(M : sig
             dml (DELETE FROM mytoken WHERE TRUE);
             dml (INSERT INTO mytoken(Token, Expires)
                  VALUES ({[resp.AccessToken]}, {[addSeconds tm resp.ExpiresIn]}));
-            return resp.AccessToken
-
-    open Calendar(struct
-                      val readonly = readonly
-                      val token = token
-                  end)
+            return (Some resp.AccessToken)
 end

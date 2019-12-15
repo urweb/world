@@ -135,7 +135,12 @@ datatype updatesMode =
        | ExternalOnly
        | NoneUpdates
 
-signature CALENDAR = sig
+signature CALENDAR_AUTH = sig
+    val readonly : bool
+    val token : transaction (option string)
+end
+         
+functor Calendar(M : CALENDAR_AUTH) : sig
     structure Calendars : sig
        val list : transaction (list calendar)
     end
@@ -152,11 +157,8 @@ functor CalendarThreeLegged(M : sig
                                 include S
                                 val readonly : bool
                             end) : sig
-    include CALENDAR
-
-    val authorize : { ReturnTo : url } -> transaction page
-    val loggedIn : transaction bool
-    val logout : transaction unit
+    include CALENDAR_AUTH
+    val status : transaction xbody
 end
 
 (* SUPER-COUNTERINTUITIVE FACT TO REMEMBER: to make domain-wide delegation work
@@ -167,6 +169,4 @@ end
 functor CalendarTwoLegged(M : sig
                               include SS
                               val readonly : bool
-                          end) : sig
-    include CALENDAR
-end
+                          end) : CALENDAR_AUTH
