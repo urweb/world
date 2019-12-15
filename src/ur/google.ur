@@ -601,6 +601,9 @@ functor CalendarThreeLegged(M : sig
                            WHERE secrets.Secret = {[n]}
                              AND secrets.Expires > CURRENT_TIMESTAMP)
 
+    fun auth url =
+        authorize {ReturnTo = bless url}
+        
     val status =
         li <- loggedIn;
         li <- source li;
@@ -612,7 +615,7 @@ functor CalendarThreeLegged(M : sig
                                                onclick={fn _ => rpc logout; set li False}/></xml>
                        else
                            return <xml><button value="Log into Google Calendar"
-                                               onclick={fn _ => redirect (url (authorize {ReturnTo = cur}))}/></xml>}/>
+                                               onclick={fn _ => redirect (url (auth (show cur)))}/></xml>}/>
         </xml>
 end
 
