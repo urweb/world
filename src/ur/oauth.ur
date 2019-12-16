@@ -23,8 +23,9 @@ datatype access_response =
          Token of string
        | Error of string
 
-type token_response = {Token : string, Expires : int}
-val _ : json token_response = json_record {Token = "access_token", Expires = "expires_in"}
+type token_response = {Token : string, Expires : option int}
+val _ : json token_response = json_record_withOptional {Token = "access_token"}
+                                                       {Expires = "expires_in"}
 
 type error_response = {Error : string}
 val _ : json error_response = json_record {Error = "error_description"}
@@ -105,7 +106,7 @@ functor Make(M : S) = struct
                                          let
                                              val r = fromJson s : token_response
                                          in
-                                             (Token r.Token, Some r.Expires)
+                                             (Token r.Token, r.Expires)
                                          end)
                               | Some p => p
 
