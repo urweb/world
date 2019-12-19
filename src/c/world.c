@@ -75,7 +75,7 @@ static void doweb(uw_context ctx, uw_buffer *buf, CURL *c, uw_Basis_string url, 
     long http_code;
     curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &http_code);
 
-    if (http_code == 200 || http_code == 204)
+    if (http_code == 200 || http_code == 201 || http_code == 204)
       uw_buffer_append(buf, "", 1);
     else if (encode_errors) {
       uw_buffer_reset(buf);

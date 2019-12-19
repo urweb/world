@@ -1,4 +1,5 @@
 open Json
+open Urls
 
 type instance = string
 val read_instance = _
@@ -101,7 +102,12 @@ type query_results = {
      Records : list query_result
 }
 val _ : json query_results = json_record {Records = "records"}
-                   
+
+type response = {
+     Success : bool
+}
+val _ : json response = json_record {Success = "success"}
+                             
 functor Make(M : sig
                  val token : transaction (option string)
              end) = struct
@@ -133,5 +139,16 @@ functor Make(M : sig
         fun list inst =
             s <- api (bless ("https://" ^ inst ^ ".salesforce.com/services/data/v47.0/query?q=SELECT+name+from+Account"));
             return (List.mp (fn r => r.Nam) (fromJson s : query_results).Records)
+
+        fun exists inst name =
+            s <- api (bless ("https://" ^ inst ^ ".salesforce.com/services/data/v47.0/query?q=SELECT+name+from+Account+where+name='" ^ urlencode name ^ "'"));
+            return (List.length (fromJson s : query_results).Records = 1)
+
+        fun insert inst name =
+            s <- apiPost (bless ("https://" ^ inst ^ ".salesforce.com/services/data/v47.0/sobjects/Account/")) (toJson {Nam = name});
+            if (fromJson s : response).Success then
+                return ()
+            else
+                error <xml>Salesforce account insert failed.</xml>
     end
 end

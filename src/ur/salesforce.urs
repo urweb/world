@@ -22,5 +22,7 @@ functor Make(M : sig
              end) : sig
     structure Accounts : sig
         val list : instance -> transaction (list account)
+        val exists : instance -> account -> transaction bool
+        val insert : instance -> account -> transaction unit
     end
 end
