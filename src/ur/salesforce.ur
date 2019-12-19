@@ -89,19 +89,73 @@ functor ThreeLegged(M : sig
         </xml>
 end
 
-type account = string
-val read_account = _
-val show_account = _
+type account_name = string
+val read_account_name = _
+val show_account_name = _
 
-type query_result = {
-     Nam : account
+type account_id = string
+val read_account_id = _
+val show_account_id = _
+
+type account = {
+     Id : account_id,
+     Nam : account_name
 }
-val _ : json query_result = json_record {Nam = "Name"}
+
+type new_account = {
+     Nam : account_name
+}
+val _ : json new_account = json_record {Nam = "Name"}
+
+type new_contact = {
+     FirstName : string,
+     LastName : string,
+     Account : option account_id,
+     Email : option string
+}
+val _ : json new_contact = json_record_withOptional {FirstName = "FirstName",
+                                                     LastName = "LastName"}
+                                                    {Account = "AccountId",
+                                                     Email = "Email"}
+
+type contact_name = {
+     FirstName : string,
+     LastName : string
+}
+
+type attributes = {
+     Url : string
+}
+val _ : json attributes = json_record {Url = "url"}
+
+type account_query_result = {
+     Attributes : attributes,
+     Nam : account_name
+}
+val _ : json account_query_result = json_record {Nam = "Name", Attributes = "attributes"}
                    
-type query_results = {
-     Records : list query_result
+type account_query_results = {
+     Records : list account_query_result
 }
-val _ : json query_results = json_record {Records = "records"}
+val _ : json account_query_results = json_record {Records = "records"}
+
+type contact_query_result = {
+     Attributes : attributes,
+     FirstName : string,
+     LastName : string,
+     Account : option account_id,
+     Email : option string
+}
+val _ : json contact_query_result = json_record_withOptional {FirstName = "FirstName",
+                                                              LastName = "LastName",
+                                                              Attributes = "attributes"}
+                                                             {Account = "AccountId",
+                                                              Email = "Email"}
+
+type contact_query_results = {
+     Records : list contact_query_result
+}
+val _ : json contact_query_results = json_record {Records = "records"}
 
 type response = {
      Success : bool
@@ -135,20 +189,60 @@ functor Make(M : sig
         tok <- token;
         WorldFfi.delete url (Some ("Bearer " ^ tok))
 
+    fun idFromUrl url =
+        let
+            fun findLastSlash s suffix =
+                if s = "" then
+                    suffix
+                else
+                    findLastSlash (String.suffix s 1) (if String.sub s 0 = #"/" then
+                                                           String.suffix s 1
+                                                       else
+                                                           suffix)
+        in
+            findLastSlash url url
+        end
+
+    fun addId [r ::: {Type}] [[Attributes, Id] ~ r] (r : $([Attributes = {Url : string}] ++ r))
+        : $([Id = string] ++ r) = r -- #Attributes ++ {Id = idFromUrl r.Attributes.Url}
+
+    fun prefix inst = "https://" ^ inst ^ ".salesforce.com/services/data/v47.0/"
+          
     structure Accounts = struct
         fun list inst =
-            s <- api (bless ("https://" ^ inst ^ ".salesforce.com/services/data/v47.0/query?q=SELECT+name+from+Account"));
-            return (List.mp (fn r => r.Nam) (fromJson s : query_results).Records)
+            s <- api (bless (prefix inst ^ "query?q=SELECT+name+from+Account"));
+            return (List.mp addId (fromJson s : account_query_results).Records)
 
-        fun exists inst name =
-            s <- api (bless ("https://" ^ inst ^ ".salesforce.com/services/data/v47.0/query?q=SELECT+name+from+Account+where+name='" ^ urlencode name ^ "'"));
-            return (List.length (fromJson s : query_results).Records = 1)
+        fun existsByName inst name =
+            s <- api (bless (prefix inst ^ "query?q=SELECT+name+from+Account+where+name='" ^ urlencode name ^ "'"));
+            return (List.length (fromJson s : account_query_results).Records = 1)
 
-        fun insert inst name =
-            s <- apiPost (bless ("https://" ^ inst ^ ".salesforce.com/services/data/v47.0/sobjects/Account/")) (toJson {Nam = name});
+        fun lookupByName inst name =
+            s <- api (bless (prefix inst ^ "query?q=SELECT+name+from+Account+where+name='" ^ urlencode name ^ "'"));
+            case (fromJson s : account_query_results).Records of
+                [] => return None
+              | r :: [] => return (Some (addId r))
+              | _ => error <xml>Multiple records returned from Salesforce account lookup by name</xml>
+
+        fun insert inst ac =
+            s <- apiPost (bless (prefix inst ^ "sobjects/Account/")) (toJson ac);
             if (fromJson s : response).Success then
                 return ()
             else
                 error <xml>Salesforce account insert failed.</xml>
+    end
+
+    structure Contacts = struct
+        fun existsByName inst name =
+            s <- api (bless (prefix inst ^ "query?q=SELECT+firstname,+lastname+from+Contact+where+firstname='" ^ urlencode name.FirstName ^ "'+and+lastname='" ^ urlencode name.LastName ^ "'"));
+            return (List.length (fromJson s : contact_query_results).Records = 1)
+
+        fun insert inst ct =
+            debug ("Body " ^ show (toJson ct));
+            s <- apiPost (bless (prefix inst ^ "sobjects/Contact/")) (toJson ct);
+            if (fromJson s : response).Success then
+                return ()
+            else
+                error <xml>Salesforce contact insert failed.</xml>
     end
 end

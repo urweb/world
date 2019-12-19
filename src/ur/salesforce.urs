@@ -13,16 +13,47 @@ functor ThreeLegged(M : sig
     val status : transaction xbody
 end
 
-type account
-val read_account : read account
-val show_account : show account
-                           
+type account_name
+val read_account_name : read account_name
+val show_account_name : show account_name
+
+type account_id
+val read_account_id : read account_id
+val show_account_id : show account_id
+
+type account = {
+     Id : account_id,
+     Nam : account_name
+}
+
+type new_account = {
+     Nam : account_name
+}
+
+type new_contact = {
+     FirstName : string,
+     LastName : string,
+     Account : option account_id,
+     Email : option string
+}
+
+type contact_name = {
+     FirstName : string,
+     LastName : string
+}
+
 functor Make(M : sig
                  val token : transaction (option string)
              end) : sig
     structure Accounts : sig
         val list : instance -> transaction (list account)
-        val exists : instance -> account -> transaction bool
-        val insert : instance -> account -> transaction unit
+        val existsByName : instance -> account_name -> transaction bool
+        val lookupByName : instance -> account_name -> transaction (option account)
+        val insert : instance -> new_account -> transaction unit
+    end
+
+    structure Contacts : sig
+        val existsByName : instance -> contact_name -> transaction bool
+        val insert : instance -> new_contact -> transaction unit
     end
 end
