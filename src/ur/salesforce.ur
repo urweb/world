@@ -175,7 +175,7 @@ functor Make(M : sig
          
     fun api url =
         tok <- token;
-        WorldFfi.get url (Some ("Bearer " ^ tok))
+        WorldFfi.get url (Some ("Bearer " ^ tok)) False
 
     fun apiPost url body =
         tok <- token;

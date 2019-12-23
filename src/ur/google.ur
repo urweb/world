@@ -33,7 +33,7 @@ functor Login(M : S) = struct
     cookie user : { ResourceName : string, Secret : int }
 
     fun withToken {Token = tok, ...} =
-        profile <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses") (Some ("Bearer " ^ tok));
+        profile <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses") (Some ("Bearer " ^ tok)) False;
         (profile : profile) <- return (Json.fromJson profile);
         secret <- oneOrNoRowsE1 (SELECT (secrets.Secret)
                                  FROM secrets
@@ -229,7 +229,7 @@ functor Gmail(M : S) = struct
 
     fun api url =
         tok <- token;
-        WorldFfi.get url (Some ("Bearer " ^ tok))
+        WorldFfi.get url (Some ("Bearer " ^ tok)) False
 
     val emailAddress =
         r <- getCookie email;
@@ -417,7 +417,7 @@ functor Calendar(M : CALENDAR_AUTH) = struct
          
     fun api url =
         tok <- token;
-        WorldFfi.get url (Some ("Bearer " ^ tok))
+        WorldFfi.get url (Some ("Bearer " ^ tok)) False
 
     fun apiPost url body =
         tok <- token;

@@ -158,6 +158,11 @@ val _ : json person = json_record {Id = "id",
                                    EmailProvider = "emailProvider",
                                    IndexedAt = "indexedAt"}
 
+datatype response a =
+         Answer of a
+       | NotFound
+       | LookingUpAsynchronously
+
 functor Make(M : sig
                  val token : transaction (option string)
              end) = struct
@@ -169,11 +174,16 @@ functor Make(M : sig
          
     fun api url =
         tok <- token;
-        WorldFfi.get url (Some ("Bearer " ^ tok))
+        WorldFfi.get url (Some ("Bearer " ^ tok)) True
          
     structure Person = struct
         fun lookup {Email = email} =
             s <- api (bless ("https://person.clearbit.com/v2/people/find?email=" ^ urlencode email));
-            return (Json.fromJson s)
+            code <- WorldFfi.lastErrorCode;
+            case code of
+                200 => return (Answer (Json.fromJson s))
+              | 202 => return LookingUpAsynchronously
+              | 404 => return NotFound
+              | _ => error <xml>Error response from Clearbit: {[s]}</xml>
     end
 end

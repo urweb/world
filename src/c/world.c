@@ -44,6 +44,12 @@ static size_t write_buffer_data(void *buffer, size_t size, size_t nmemb, void *u
 static const char curl_failure[] = "error=fetch_url&error_description=";
 static const char server_failure[] = "error=fetch_url&error_description=";
 
+uw_Basis_int uw_WorldFfi_lastErrorCode(uw_context ctx) {
+  void *p = uw_get_global(ctx, "world.lastErrorCode");
+  if (p) return (uw_Basis_int)p;
+  else return 200;
+}
+
 static void doweb(uw_context ctx, uw_buffer *buf, CURL *c, uw_Basis_string url, int encode_errors) {
   if (strncmp(url, "https://", 8))
     uw_error(ctx, FATAL, "World: URL is not HTTPS");
@@ -74,6 +80,7 @@ static void doweb(uw_context ctx, uw_buffer *buf, CURL *c, uw_Basis_string url, 
   } else {
     long http_code;
     curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &http_code);
+    uw_set_global(ctx, "world.lastErrorCode", (void *)http_code, NULL);
 
     if (http_code == 200 || http_code == 201 || http_code == 204)
       uw_buffer_append(buf, "", 1);
@@ -157,7 +164,7 @@ uw_Basis_string uw_WorldFfi_delete(uw_context ctx, uw_Basis_string url, uw_Basis
   return nonget("DELETE", ctx, url, auth, NULL, NULL);
 }
 
-uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_string auth) {
+uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_bool encode_errors) {
   uw_buffer buf;
   CURL *c = curl(ctx);
 
@@ -177,7 +184,7 @@ uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_st
   curl_easy_setopt(c, CURLOPT_HTTPHEADER, slist);
   uw_push_cleanup(ctx, (void (*)(void *))curl_slist_free_all, slist);
  
-  doweb(ctx, &buf, c, url, 0);
+  doweb(ctx, &buf, c, url, encode_errors);
   uw_Basis_string ret = uw_strdup(ctx, buf.start);
   uw_pop_cleanup(ctx);
   uw_pop_cleanup(ctx);

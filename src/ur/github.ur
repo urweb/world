@@ -57,7 +57,7 @@ functor Make(M : S) = struct
     open M
 
     fun updateProfile url tokOpt =
-        profile <- WorldFfi.get url (Option.mp (fn s => "token " ^ s) tokOpt);
+        profile <- WorldFfi.get url (Option.mp (fn s => "token " ^ s) tokOpt) False;
         (profile : profile) <- return (Json.fromJson profile);
         exists <- oneRowE1 (SELECT COUNT( * ) > 0
                             FROM users

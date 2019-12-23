@@ -95,10 +95,15 @@ type person = {
      IndexedAt : option time
 }
                            
+datatype response a =
+         Answer of a
+       | NotFound
+       | LookingUpAsynchronously
+
 functor Make(M : sig
                  val token : transaction (option string)
              end) : sig
     structure Person : sig
-        val lookup : {Email : string} -> transaction person
+        val lookup : {Email : string} -> transaction (response person)
     end
 end
