@@ -181,14 +181,6 @@ functor Make(M : sig
         tok <- token;
         WorldFfi.post url (Some ("Bearer " ^ tok)) (Some "application/json") body
 
-    fun apiPut url body =
-        tok <- token;
-        WorldFfi.put url (Some ("Bearer " ^ tok)) (Some "application/json") body
-
-    fun apiDelete url =
-        tok <- token;
-        WorldFfi.delete url (Some ("Bearer " ^ tok))
-
     fun idFromUrl url =
         let
             fun findLastSlash s suffix =
