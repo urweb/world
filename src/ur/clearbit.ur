@@ -362,7 +362,7 @@ functor Make(M : sig
                 200 => return (Answer (Json.fromJson s))
               | 202 => return LookingUpAsynchronously
               | 404 => return NotFound
-              | _ => error <xml>Error response from Clearbit for person: {[s]}</xml>
+              | _ => error <xml>Error code #{[code]} from Clearbit for person: {[s]}</xml>
     end
 
     structure Company = struct
@@ -373,6 +373,6 @@ functor Make(M : sig
                 200 => return (Answer (Json.fromJson s))
               | 202 => return LookingUpAsynchronously
               | 404 => return NotFound
-              | _ => error <xml>Error response from Clearbit for company: {[s]}</xml>
+              | _ => error <xml>Error code #{[code]} from Clearbit for company: {[s]}</xml>
     end
 end
