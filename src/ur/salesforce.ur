@@ -99,13 +99,16 @@ val show_account_id = _
 
 type account = {
      Id : account_id,
-     Nam : account_name
+     Nam : account_name,
+     Website : option string
 }
 
 type new_account = {
-     Nam : account_name
+     Nam : account_name,
+     Website : option string
 }
-val _ : json new_account = json_record {Nam = "Name"}
+val _ : json new_account = json_record_withOptional {Nam = "Name"}
+                           {Website = "Website"}
 
 type new_contact = {
      FirstName : string,
@@ -130,9 +133,10 @@ val _ : json attributes = json_record {Url = "url"}
 
 type account_query_result = {
      Attributes : attributes,
-     Nam : account_name
+     Nam : account_name,
+     Website : option string
 }
-val _ : json account_query_result = json_record {Nam = "Name", Attributes = "attributes"}
+val _ : json account_query_result = json_record {Nam = "Name", Attributes = "attributes", Website = "Website"}
                    
 type account_query_results = {
      Records : list account_query_result
@@ -202,7 +206,7 @@ functor Make(M : sig
           
     structure Accounts = struct
         fun list inst =
-            s <- api (bless (prefix inst ^ "query?q=SELECT+name+from+Account"));
+            s <- api (bless (prefix inst ^ "query?q=SELECT+name,website+from+Account"));
             return (List.mp addId (fromJson s : account_query_results).Records)
 
         fun existsByName inst name =
@@ -210,7 +214,7 @@ functor Make(M : sig
             return (List.length (fromJson s : account_query_results).Records = 1)
 
         fun lookupByName inst name =
-            s <- api (bless (prefix inst ^ "query?q=SELECT+name+from+Account+where+name='" ^ urlencode name ^ "'"));
+            s <- api (bless (prefix inst ^ "query?q=SELECT+name,website+from+Account+where+name='" ^ urlencode name ^ "'"));
             case (fromJson s : account_query_results).Records of
                 [] => return None
               | r :: [] => return (Some (addId r))

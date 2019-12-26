@@ -23,11 +23,13 @@ val show_account_id : show account_id
 
 type account = {
      Id : account_id,
-     Nam : account_name
+     Nam : account_name,
+     Website : option string
 }
 
 type new_account = {
-     Nam : account_name
+     Nam : account_name,
+     Website : option string
 }
 
 type new_contact = {
