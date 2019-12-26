@@ -210,6 +210,7 @@ type company = {
 
 datatype response a =
          Answer of a
+       | MalformedName
        | NotFound
        | LookingUpAsynchronously
 

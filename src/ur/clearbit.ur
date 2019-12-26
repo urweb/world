@@ -338,6 +338,7 @@ val _ : json company = json_record {Id = "id",
 
 datatype response a =
          Answer of a
+       | MalformedName
        | NotFound
        | LookingUpAsynchronously
 
@@ -362,6 +363,7 @@ functor Make(M : sig
                 200 => return (Answer (Json.fromJson s))
               | 202 => return LookingUpAsynchronously
               | 404 => return NotFound
+              | 422 => return MalformedName
               | _ => error <xml>Error code #{[code]} from Clearbit for person: {[s]}</xml>
     end
 
@@ -373,6 +375,7 @@ functor Make(M : sig
                 200 => return (Answer (Json.fromJson s))
               | 202 => return LookingUpAsynchronously
               | 404 => return NotFound
+              | 422 => return MalformedName
               | _ => error <xml>Error code #{[code]} from Clearbit for company: {[s]}</xml>
     end
 end
