@@ -210,7 +210,7 @@ functor Make(M : sig
             return (List.mp addId (fromJson s : account_query_results).Records)
 
         fun existsByName inst name =
-            s <- api (bless (prefix inst ^ "query?q=SELECT+name+from+Account+where+name='" ^ urlencode name ^ "'"));
+            s <- api (bless (prefix inst ^ "query?q=SELECT+name,website+from+Account+where+name='" ^ urlencode name ^ "'"));
             return (List.length (fromJson s : account_query_results).Records = 1)
 
         fun lookupByName inst name =
