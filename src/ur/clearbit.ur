@@ -270,11 +270,6 @@ type parent = {
 }
 val _ : json parent = json_record {Domain = "domain"}
 
-type ultimate_parent = {
-     Domain : option string
-}
-val _ : json ultimate_parent = json_record {Domain = "domain"}
-
 type company = {
      Id : option string,
      Nam : option string,
@@ -303,7 +298,6 @@ type company = {
      Tech : list string,
      TechCategories : list string,
      Parent : parent,
-     UltimateParent : ultimate_parent,
      IndexedAt : option time
 }
 val _ : json company = json_record {Id = "id",
@@ -333,7 +327,6 @@ val _ : json company = json_record {Id = "id",
                                     Tech = "tech",
                                     TechCategories = "techCategories",
                                     Parent = "parent",
-                                    UltimateParent = "ultimate_parent",
                                     IndexedAt = "indexedAt"}
 
 datatype response a =

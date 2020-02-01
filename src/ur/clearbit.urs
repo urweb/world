@@ -170,10 +170,6 @@ type parent = {
      Domain : option string
 }
 
-type ultimate_parent = {
-     Domain : option string
-}
-
 type company = {
      Id : option string,
      Nam : option string,
@@ -202,7 +198,6 @@ type company = {
      Tech : list string,
      TechCategories : list string,
      Parent : parent,
-     UltimateParent : ultimate_parent,
      IndexedAt : option time
 }
 
