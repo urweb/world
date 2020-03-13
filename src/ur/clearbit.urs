@@ -45,7 +45,7 @@ type github = {
 
 type person_twitter = {
      Handle : option string,
-     Id : option string,
+     Id : option int,
      Followers : option int,
      Following : option int,
      Location : option string,
@@ -68,11 +68,16 @@ type gravatar_url = {
      Title : option string
 }
 
+type gravatar_avatar = {
+     Url : option string,
+     Typ : option string
+}
+
 type gravatar = {
      Handle : option string,
      Urls : list gravatar_url,
      Avatar : option string,
-     Avatars : list gravatar_url
+     Avatars : list gravatar_avatar
 }
 
 type person = {
@@ -153,7 +158,7 @@ type company_linkedin = {
 
 type company_twitter = {
      Handle : option string,
-     Id : option string,
+     Id : option int,
      Bio : option string,
      Followers : option int,
      Following : option int,

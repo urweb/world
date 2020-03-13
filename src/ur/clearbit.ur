@@ -70,7 +70,7 @@ val _ : json github = json_record {Handle = "handle",
 
 type person_twitter = {
      Handle : option string,
-     Id : option string,
+     Id : option int,
      Followers : option int,
      Following : option int,
      Location : option string,
@@ -106,11 +106,18 @@ type gravatar_url = {
 val _ : json gravatar_url = json_record {Value = "value",
                                          Title = "title"}
 
+type gravatar_avatar = {
+     Url : option string,
+     Typ : option string
+}
+val _ : json gravatar_avatar = json_record {Url = "url",
+                                            Typ = "type"}
+
 type gravatar = {
      Handle : option string,
      Urls : list gravatar_url,
      Avatar : option string,
-     Avatars : list gravatar_url
+     Avatars : list gravatar_avatar
 }
 val _ : json gravatar = json_record {Handle = "handle",
                                      Urls = "urls",
@@ -243,7 +250,7 @@ val _ : json company_linkedin = json_record {Handle = "handle"}
 
 type company_twitter = {
      Handle : option string,
-     Id : option string,
+     Id : option int,
      Bio : option string,
      Followers : option int,
      Following : option int,
@@ -358,6 +365,7 @@ functor Make(M : sig
     structure Person = struct
         fun lookup {Email = email} =
             s <- api (bless ("https://person.clearbit.com/v2/people/find?email=" ^ urlencode email));
+            debug ("Response: " ^ s);
             code <- WorldFfi.lastErrorCode;
             case code of
                 200 => return (Answer (Json.fromJson s))
