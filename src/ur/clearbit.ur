@@ -365,7 +365,6 @@ functor Make(M : sig
     structure Person = struct
         fun lookup {Email = email} =
             s <- api (bless ("https://person.clearbit.com/v2/people/find?email=" ^ urlencode email));
-            debug ("Response: " ^ s);
             code <- WorldFfi.lastErrorCode;
             case code of
                 200 => return (Answer (Json.fromJson s))
