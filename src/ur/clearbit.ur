@@ -363,15 +363,27 @@ functor Make(M : sig
         WorldFfi.get url (Some ("Bearer " ^ tok)) True
          
     structure Person = struct
-        fun lookup {Email = email} =
-            s <- api (bless ("https://person.clearbit.com/v2/people/find?email=" ^ urlencode email));
-            code <- WorldFfi.lastErrorCode;
-            case code of
-                200 => return (Answer (Json.fromJson s))
-              | 202 => return LookingUpAsynchronously
-              | 404 => return NotFound
-              | 422 => return MalformedName
-              | _ => error <xml>Error code #{[code]} from Clearbit for person: {[s]}</xml>
+        fun lookup r =
+            let
+                fun addPart url key value =
+                    return (case value of
+                                None => url
+                              | Some value => url ^ "&" ^ key ^ "=" ^ urlencode value)
+            in
+                url <- return ("https://person.clearbit.com/v2/people/find?email=" ^ urlencode r.Email);
+                url <- addPart url "given_name" r.GivenName;
+                url <- addPart url "family_name" r.FamilyName;
+                url <- addPart url "company" r.Company;
+                url <- addPart url "company_domain" r.CompanyDomain;
+                s <- api (bless url);
+                code <- WorldFfi.lastErrorCode;
+                case code of
+                    200 => return (Answer (Json.fromJson s))
+                  | 202 => return LookingUpAsynchronously
+                  | 404 => return NotFound
+                  | 422 => return MalformedName
+                  | _ => error <xml>Error code #{[code]} from Clearbit for person: {[s]}</xml>
+            end
     end
 
     structure Company = struct

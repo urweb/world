@@ -223,7 +223,11 @@ functor Make(M : sig
                  val token : transaction (option string)
              end) : sig
     structure Person : sig
-        val lookup : {Email : string} -> transaction (response person)
+        val lookup : {Email : string,
+                      GivenName : option string,
+                      FamilyName : option string,
+                      Company : option string,
+                      CompanyDomain : option string} -> transaction (response person)
     end
 
     structure Company : sig
