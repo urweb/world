@@ -231,6 +231,7 @@ functor Make(M : sig
     end
 
     structure Company : sig
-        val lookup : {Domain : string} -> transaction (response company)
+        val lookup : {Domain : string,
+                      CompanyName : option string} -> transaction (response company)
     end
 end

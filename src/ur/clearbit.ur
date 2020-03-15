@@ -361,34 +361,34 @@ functor Make(M : sig
     fun api url =
         tok <- token;
         WorldFfi.get url (Some ("Bearer " ^ tok)) True
-         
+
+    fun addPart url key value =
+        return (case value of
+                    None => url
+                  | Some value => url ^ "&" ^ key ^ "=" ^ urlencode value)
+        
     structure Person = struct
         fun lookup r =
-            let
-                fun addPart url key value =
-                    return (case value of
-                                None => url
-                              | Some value => url ^ "&" ^ key ^ "=" ^ urlencode value)
-            in
-                url <- return ("https://person.clearbit.com/v2/people/find?email=" ^ urlencode r.Email);
-                url <- addPart url "given_name" r.GivenName;
-                url <- addPart url "family_name" r.FamilyName;
-                url <- addPart url "company" r.Company;
-                url <- addPart url "company_domain" r.CompanyDomain;
-                s <- api (bless url);
-                code <- WorldFfi.lastErrorCode;
-                case code of
-                    200 => return (Answer (Json.fromJson s))
-                  | 202 => return LookingUpAsynchronously
-                  | 404 => return NotFound
-                  | 422 => return MalformedName
-                  | _ => error <xml>Error code #{[code]} from Clearbit for person: {[s]}</xml>
-            end
+            url <- return ("https://person.clearbit.com/v2/people/find?email=" ^ urlencode r.Email);
+            url <- addPart url "given_name" r.GivenName;
+            url <- addPart url "family_name" r.FamilyName;
+            url <- addPart url "company" r.Company;
+            url <- addPart url "company_domain" r.CompanyDomain;
+            s <- api (bless url);
+            code <- WorldFfi.lastErrorCode;
+            case code of
+                200 => return (Answer (Json.fromJson s))
+              | 202 => return LookingUpAsynchronously
+              | 404 => return NotFound
+              | 422 => return MalformedName
+              | _ => error <xml>Error code #{[code]} from Clearbit for person: {[s]}</xml>
     end
 
     structure Company = struct
-        fun lookup {Domain = domain} =
-            s <- api (bless ("https://company.clearbit.com/v2/companies/find?domain=" ^ urlencode domain));
+        fun lookup r =
+            url <- return ("https://company.clearbit.com/v2/companies/find?domain=" ^ urlencode r.Domain);
+            url <- addPart url "company_name" r.CompanyName;
+            s <- api (bless url);
             code <- WorldFfi.lastErrorCode;
             case code of
                 200 => return (Answer (Json.fromJson s))
