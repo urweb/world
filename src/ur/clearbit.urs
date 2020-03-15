@@ -197,7 +197,7 @@ type company = {
      Identifiers : identifiers,
      Metrics : metrics,
      Facebook : company_facebook,
-     LinkedIn : company_linkedin,
+     Linkedin : company_linkedin,
      Twitter : company_twitter,
      Crunchbase : crunchbase,
      Logo : option string,
