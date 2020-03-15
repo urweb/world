@@ -381,6 +381,7 @@ functor Make(M : sig
               | 202 => return LookingUpAsynchronously
               | 404 => return NotFound
               | 422 => return MalformedName
+              | 402 => error <xml>You have exceeded your Clearbit quota for this time period.  Time to upgrade to a more expensive plan?</xml>
               | _ => error <xml>Error code #{[code]} from Clearbit for person: {[s]}</xml>
     end
 
@@ -395,6 +396,7 @@ functor Make(M : sig
               | 202 => return LookingUpAsynchronously
               | 404 => return NotFound
               | 422 => return MalformedName
+              | 402 => error <xml>You have exceeded your Clearbit quota for this time period.  Time to upgrade to a more expensive plan?</xml>
               | _ => error <xml>Error code #{[code]} from Clearbit for company: {[s]}</xml>
     end
 end
