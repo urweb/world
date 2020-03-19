@@ -207,7 +207,8 @@ fun eq [ts ::: {Type}] [t ::: Type] (a : exp ts t) (b : exp ts t) =
 type query (full :: {Type}) (chosen :: {Type}) =
      {Select : $(map (fn _ => string) full) -> string,
       Json : $(map (fn _ => string) full) -> $(map json full) -> json $chosen,
-      Where : option (expr (variant (map (fn _ => unit) full)))}
+      Where : option (expr (variant (map (fn _ => unit) full))),
+      OrderBy : list (variant (map (fn _ => unit) full) * bool)}
 
 fun select [chosen :: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen] (fl : folder chosen) =
     {Select = fn labels =>
@@ -220,14 +221,21 @@ fun select [chosen :: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen] (fl : fo
                   "" fl (labels --- _),
      Json = fn labels jsons =>
                @json_record fl (jsons --- _) (labels --- _),
-     Where = None}
+     Where = None,
+     OrderBy = []}
 
 fun wher [ts ::: {Type}] [chosen ::: {Type}] (e : exp ts bool) (q : query ts chosen) =
-    {Select = q.Select,
-     Json = q.Json,
-     Where = Some (case q.Where of
-                       None => e
-                     | Some e' => Binop (And, e', e))}
+    q -- #Where ++ {Where = Some (case q.Where of
+                                      None => e
+                                    | Some e' => Binop (And, e', e))}
+
+fun orderByAsc [nm :: Name] [t ::: Type] [r ::: {Type}] [chosen ::: {Type}] [[nm] ~ r]
+               (q : query ([nm = t] ++ r) chosen) =
+    q -- #OrderBy ++ {OrderBy = List.append q.OrderBy ((make [nm] (), True) :: [])}
+
+fun orderByDesc [nm :: Name] [t ::: Type] [r ::: {Type}] [chosen ::: {Type}] [[nm] ~ r]
+               (q : query ([nm = t] ++ r) chosen) =
+    q -- #OrderBy ++ {OrderBy = List.append q.OrderBy ((make [nm] (), False) :: [])}
 
 fun vproj [t ::: Type] [r ::: {Unit}] (fl : folder r) (r : $(mapU t r)) (v : variant (mapU unit r)) =
     match v (@Top.mp [fn _ => t] [fn _ => unit -> t]
@@ -310,13 +318,13 @@ functor Make(M : sig
                 error <xml>Salesforce contact insert failed.</xml>
     end
 
-    functor QueryOne(N : sig
-                         val stable : stable
-                         con fields :: {Type}
-                         val labels : $(map (fn _ => string) fields)
-                         val jsons : $(map json fields)
-                         val fl : folder fields
-                     end) = struct
+    functor Query(N : sig
+                      val stable : stable
+                      con fields :: {Type}
+                      val labels : $(map (fn _ => string) fields)
+                      val jsons : $(map json fields)
+                      val fl : folder fields
+                  end) = struct
         open N
 
         fun escapeSingleQuotes s =
@@ -343,11 +351,13 @@ functor Make(M : sig
                 Eq => False
               | And => True
 
+        val labelOf = @@vproj [string] [map (fn _ => ()) fields]
+                        (@Folder.mp fl) labels
+
         fun formatExp e =
             case e of
                 String s => urlencode ("'" ^ escapeSingleQuotes s ^ "'")
-              | Field f => @@vproj [string] [map (fn _ => ()) fields]
-                             (@Folder.mp fl) labels f
+              | Field f => labelOf f
               | Binop (b, e1, e2) =>
                 if allowsParens b then
                     "(" ^ formatExp e1 ^ ")"
@@ -358,17 +368,31 @@ functor Make(M : sig
                     ^ formatBinop b
                     ^ "+" ^ formatExp e2
 
+        fun formatOrderBy1 (v, b) =
+            labelOf v ^ "+" ^ (if b then "ASC" else "DESC")
+
         fun formatQuery [chosen] (q : query fields chosen) =
             let
                 val qu = "SELECT+" ^ q.Select labels ^ "+FROM+" ^ stable
+
+                val qu = case q.Where of
+                             None => qu
+                           | Some e => qu ^ "+WHERE+" ^ formatExp e
+
+                val qu = case q.OrderBy of
+                             [] => qu
+                           | ob1 :: obs =>
+                             List.foldl (fn ob acc =>
+                                            acc ^ "," ^ formatOrderBy1 ob)
+                             (qu ^ "+ORDER+BY+" ^ formatOrderBy1 ob1) obs
             in
-                case q.Where of
-                    None => qu
-                  | Some e => qu ^ "+WHERE+" ^ formatExp e
+                qu
             end
              
         fun query [chosen] inst (q : query fields chosen) =
-            s <- api (bless (prefix inst ^ "query?q=" ^ @formatQuery q));
+            qs <- return (prefix inst ^ "query?q=" ^ @formatQuery q);
+            debug ("Query: " ^ qs);
+            s <- api (bless qs);
             return (@fromJson (@json_query_results (q.Json labels jsons)) s : query_results $chosen).Records
     end
 end

@@ -64,6 +64,10 @@ val select : chosen :: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
     -> query (chosen ++ unchosen) chosen
 val wher : ts ::: {Type} -> chosen ::: {Type}
            -> exp ts bool -> query ts chosen -> query ts chosen
+val orderByAsc : nm :: Name -> t ::: Type -> r ::: {Type} -> chosen ::: {Type} -> [[nm] ~ r]
+                 => query ([nm = t] ++ r) chosen -> query ([nm = t] ++ r) chosen
+val orderByDesc : nm :: Name -> t ::: Type -> r ::: {Type} -> chosen ::: {Type} -> [[nm] ~ r]
+                  => query ([nm = t] ++ r) chosen -> query ([nm = t] ++ r) chosen
 
 functor Make(M : sig
                  val token : transaction (option string)
@@ -83,13 +87,13 @@ functor Make(M : sig
         val insert : instance -> new_contact -> transaction unit
     end
 
-    functor QueryOne(N : sig
-                         val stable : stable
-                         con fields :: {Type}
-                         val labels : $(map (fn _ => string) fields)
-                         val jsons : $(map Json.json fields)
-                         val fl : folder fields
-                     end) : sig
+    functor Query(N : sig
+                      val stable : stable
+                      con fields :: {Type}
+                      val labels : $(map (fn _ => string) fields)
+                      val jsons : $(map Json.json fields)
+                      val fl : folder fields
+                  end) : sig
         val query : chosen ::: {Type} -> instance -> query N.fields chosen -> transaction (list $chosen)
     end
 end
