@@ -5,6 +5,21 @@ type instance = string
 val read_instance = _
 val show_instance = _
 
+val sread = mkRead' (fn s =>
+                        if s <> "" && Char.isAlpha (String.sub s 0)
+                           && String.all (fn ch => Char.isAlpha ch || Char.isDigit ch) s then
+                            Some s
+                        else
+                            None)
+                    
+type stable = string
+val read_stable = sread "Salesforce SObject table"
+val show_stable = _
+
+type sfield = string
+val read_sfield = sread "Salesforce SObject field"
+val show_sfield = _
+
 functor ThreeLegged(M : sig
                         val https : bool
                         val sandbox : bool
@@ -161,11 +176,40 @@ type contact_query_results = {
 }
 val _ : json contact_query_results = json_record {Records = "records"}
 
+type query_results (r :: Type) = {
+     Records : list r
+}
+fun json_query_results [r] (_ : json r) : json (query_results r) = json_record {Records = "records"}
+                                     
 type response = {
      Success : bool
 }
 val _ : json response = json_record {Success = "success"}
-                             
+
+type query (full :: {Type}) (chosen :: {Type}) =
+     {Select : $(map (fn _ => string) full) -> string,
+      Json : $(map (fn _ => string) full) -> $(map json full) -> json $chosen}
+
+fun select [chosen :: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen] (fl : folder chosen) =
+    {Select = fn labels =>
+                 @foldR [fn _ => string] [fn _ => string]
+                  (fn [nm ::_] [t ::_] [r ::_] [[nm] ~ r] (l : string) (acc : string) =>
+                      if acc = "" then
+                          l
+                      else
+                          acc ^ "," ^ l)
+                  "" fl (labels --- _),
+     Json = fn labels jsons =>
+               @json_record fl (jsons --- _) (labels --- _)}
+        
+signature QUERY = sig
+    con fields :: {Type}
+    con query :: {Type} -> {Type} -> Type
+    val select : chosen :: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
+                 => folder chosen
+                 -> query (chosen ++ unchosen) chosen
+end
+
 functor Make(M : sig
                  val token : transaction (option string)
              end) = struct
@@ -234,11 +278,23 @@ functor Make(M : sig
             return (List.length (fromJson s : contact_query_results).Records = 1)
 
         fun insert inst ct =
-            debug ("Body " ^ show (toJson ct));
             s <- apiPost (bless (prefix inst ^ "sobjects/Contact/")) (toJson ct);
             if (fromJson s : response).Success then
                 return ()
             else
                 error <xml>Salesforce contact insert failed.</xml>
+    end
+
+    functor QueryOne(N : sig
+                         val stable : stable
+                         con fields :: {Type}
+                         val labels : $(map (fn _ => string) fields)
+                         val jsons : $(map json fields)
+                     end) = struct
+        open N
+
+        fun query [chosen] inst (q : query fields chosen) =
+            s <- api (bless (prefix inst ^ "query?q=SELECT+" ^ q.Select labels ^ "+FROM+" ^ stable));
+            return (@fromJson (@json_query_results (q.Json labels jsons)) s : query_results $chosen).Records
     end
 end

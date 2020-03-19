@@ -13,6 +13,14 @@ functor ThreeLegged(M : sig
     val status : transaction xbody
 end
 
+type stable (* a kind of SObject, e.g. Account, Contact *)
+val read_stable : read stable
+val show_stable : show stable
+
+type sfield
+val read_sfield : read sfield
+val show_sfield : show sfield
+                           
 type account_name
 val read_account_name : read account_name
 val show_account_name : show account_name
@@ -44,6 +52,11 @@ type contact_name = {
      LastName : string
 }
 
+con query :: {Type} -> {Type} -> Type
+val select : chosen :: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
+    => folder chosen
+    -> query (chosen ++ unchosen) chosen
+
 functor Make(M : sig
                  val token : transaction (option string)
              end) : sig
@@ -57,5 +70,14 @@ functor Make(M : sig
     structure Contacts : sig
         val existsByName : instance -> contact_name -> transaction bool
         val insert : instance -> new_contact -> transaction unit
+    end
+
+    functor QueryOne(N : sig
+                         val stable : stable
+                         con fields :: {Type}
+                         val labels : $(map (fn _ => string) fields)
+                         val jsons : $(map Json.json fields)
+                     end) : sig
+        val query : chosen ::: {Type} -> instance -> query N.fields chosen -> transaction (list $chosen)
     end
 end
