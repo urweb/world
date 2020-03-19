@@ -186,9 +186,28 @@ type response = {
 }
 val _ : json response = json_record {Success = "success"}
 
+datatype binop =
+         Eq
+       | And
+
+datatype expr f =
+         Field of f
+       | String of string
+       | Binop of binop * expr f * expr f
+
+type exp (ts :: {Type}) (t :: Type) = expr (variant (map (fn _ => unit) ts))
+
+val field [nm :: Name] [t ::: Type] [r ::: {Type}] [[nm] ~ r] =
+    Field (make [nm] ())
+fun string [ts ::: {Type}] (s : string) =
+    String s
+fun eq [ts ::: {Type}] [t ::: Type] (a : exp ts t) (b : exp ts t) =
+    Binop (Eq, a, b)
+
 type query (full :: {Type}) (chosen :: {Type}) =
      {Select : $(map (fn _ => string) full) -> string,
-      Json : $(map (fn _ => string) full) -> $(map json full) -> json $chosen}
+      Json : $(map (fn _ => string) full) -> $(map json full) -> json $chosen,
+      Where : option (expr (variant (map (fn _ => unit) full)))}
 
 fun select [chosen :: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen] (fl : folder chosen) =
     {Select = fn labels =>
@@ -200,16 +219,21 @@ fun select [chosen :: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen] (fl : fo
                           acc ^ "," ^ l)
                   "" fl (labels --- _),
      Json = fn labels jsons =>
-               @json_record fl (jsons --- _) (labels --- _)}
-        
-signature QUERY = sig
-    con fields :: {Type}
-    con query :: {Type} -> {Type} -> Type
-    val select : chosen :: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
-                 => folder chosen
-                 -> query (chosen ++ unchosen) chosen
-end
+               @json_record fl (jsons --- _) (labels --- _),
+     Where = None}
 
+fun wher [ts ::: {Type}] [chosen ::: {Type}] (e : exp ts bool) (q : query ts chosen) =
+    {Select = q.Select,
+     Json = q.Json,
+     Where = Some (case q.Where of
+                       None => e
+                     | Some e' => Binop (And, e', e))}
+
+fun vproj [t ::: Type] [r ::: {Unit}] (fl : folder r) (r : $(mapU t r)) (v : variant (mapU unit r)) =
+    match v (@Top.mp [fn _ => t] [fn _ => unit -> t]
+             (fn [u] v () => v)
+             fl r)
+    
 functor Make(M : sig
                  val token : transaction (option string)
              end) = struct
@@ -247,7 +271,8 @@ functor Make(M : sig
         : $([Id = string] ++ r) = r -- #Attributes ++ {Id = idFromUrl r.Attributes.Url}
 
     fun prefix inst = "https://" ^ inst ^ ".salesforce.com/services/data/v47.0/"
-          
+    fun record inst id = bless ("https://" ^ inst ^ ".lightning.force.com/lightning/r/" ^ urlencode id ^ "/view")
+                      
     structure Accounts = struct
         fun list inst =
             s <- api (bless (prefix inst ^ "query?q=SELECT+name,website+from+Account"));
@@ -290,11 +315,60 @@ functor Make(M : sig
                          con fields :: {Type}
                          val labels : $(map (fn _ => string) fields)
                          val jsons : $(map json fields)
+                         val fl : folder fields
                      end) = struct
         open N
 
+        fun escapeSingleQuotes s =
+            case s of
+                "" => ""
+              | _ =>
+                let
+                    val ch = String.sub s 0
+                in
+		    (case ch of
+		         #"'" => "\\'"
+		       | #"\\" => "\\\\"
+		       | x => String.str ch)
+                    ^ escapeSingleQuotes (String.suffix s 1)
+                end
+
+        fun formatBinop b =
+            case b of
+                Eq => "="
+              | And => "AND"
+
+        fun allowsParens b =
+            case b of
+                Eq => False
+              | And => True
+
+        fun formatExp e =
+            case e of
+                String s => urlencode ("'" ^ escapeSingleQuotes s ^ "'")
+              | Field f => @@vproj [string] [map (fn _ => ()) fields]
+                             (@Folder.mp fl) labels f
+              | Binop (b, e1, e2) =>
+                if allowsParens b then
+                    "(" ^ formatExp e1 ^ ")"
+                    ^ formatBinop b
+                    ^ "(" ^ formatExp e2 ^ ")"
+                else
+                    formatExp e1 ^ "+"
+                    ^ formatBinop b
+                    ^ "+" ^ formatExp e2
+
+        fun formatQuery [chosen] (q : query fields chosen) =
+            let
+                val qu = "SELECT+" ^ q.Select labels ^ "+FROM+" ^ stable
+            in
+                case q.Where of
+                    None => qu
+                  | Some e => qu ^ "+WHERE+" ^ formatExp e
+            end
+             
         fun query [chosen] inst (q : query fields chosen) =
-            s <- api (bless (prefix inst ^ "query?q=SELECT+" ^ q.Select labels ^ "+FROM+" ^ stable));
+            s <- api (bless (prefix inst ^ "query?q=" ^ @formatQuery q));
             return (@fromJson (@json_query_results (q.Json labels jsons)) s : query_results $chosen).Records
     end
 end

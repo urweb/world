@@ -52,14 +52,25 @@ type contact_name = {
      LastName : string
 }
 
+con exp :: {Type} -> Type -> Type
+val field : nm :: Name -> t ::: Type -> r ::: {Type} -> [[nm] ~ r]
+            => exp ([nm = t] ++ r) t
+val string : ts ::: {Type} -> string -> exp ts string
+val eq : ts ::: {Type} -> t ::: Type -> exp ts t -> exp ts t -> exp ts bool
+
 con query :: {Type} -> {Type} -> Type
 val select : chosen :: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
     => folder chosen
     -> query (chosen ++ unchosen) chosen
+val wher : ts ::: {Type} -> chosen ::: {Type}
+           -> exp ts bool -> query ts chosen -> query ts chosen
 
 functor Make(M : sig
                  val token : transaction (option string)
              end) : sig
+    val record : instance -> string (* object ID *) -> url
+    (* The canonical page to examine a record *)
+
     structure Accounts : sig
         val list : instance -> transaction (list account)
         val existsByName : instance -> account_name -> transaction bool
@@ -77,6 +88,7 @@ functor Make(M : sig
                          con fields :: {Type}
                          val labels : $(map (fn _ => string) fields)
                          val jsons : $(map Json.json fields)
+                         val fl : folder fields
                      end) : sig
         val query : chosen ::: {Type} -> instance -> query N.fields chosen -> transaction (list $chosen)
     end
