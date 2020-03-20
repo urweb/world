@@ -190,28 +190,37 @@ datatype binop =
          Eq
        | And
 
-datatype expr f =
+datatype expr f rf =
          Field of f
+       | RField of rf
        | String of string
-       | Binop of binop * expr f * expr f
+       | Binop of binop * expr f rf * expr f rf
 
-type exp (ts :: {Type}) (t :: Type) = expr (variant (map (fn _ => unit) ts))
+type exp' (ts :: {Type}) (rts :: {{Type}}) =
+     expr (variant (map (fn _ => unit) ts))
+          (variant (map (fn ts => variant (map (fn _ => unit) ts)) rts))
 
-val field [nm :: Name] [t ::: Type] [r ::: {Type}] [[nm] ~ r] =
+type exp (ts :: {Type}) (rts :: {{Type}}) (t :: Type) =
+     exp' ts rts
+
+val field [nm :: Name] [t ::: Type] [r ::: {Type}] [rts ::: {{Type}}] [[nm] ~ r] =
     Field (make [nm] ())
-fun string [ts ::: {Type}] (s : string) =
+fun string [ts ::: {Type}] [rts ::: {{Type}}] (s : string) =
     String s
-fun eq [ts ::: {Type}] [t ::: Type] (a : exp ts t) (b : exp ts t) =
+fun eq [ts ::: {Type}] [rts ::: {{Type}}] [t ::: Type] (a : exp ts rts t) (b : exp ts rts t) =
     Binop (Eq, a, b)
 
-type query (full :: {Type}) (chosen :: {Type}) =
-     {Select : $(map (fn _ => string) full) -> string,
-      Json : $(map (fn _ => string) full) -> $(map json full) -> json $chosen,
-      Where : option (expr (variant (map (fn _ => unit) full))),
+type query (full :: {Type}) (rfull :: {{Type}}) (chosen :: {Type}) =
+     {Select : $(map (fn _ => string) full) -> $(map (fn ts => string * $(map (fn _ => string) ts)) rfull) -> string,
+      Json : $(map (fn _ => string) full) -> $(map (fn ts => string * $(map (fn _ => string) ts)) rfull)
+             -> $(map json full) -> $(map (fn ts => $(map json ts)) rfull)
+             -> $(map (fn t => string * json t) chosen),
+      Where : option (expr (variant (map (fn _ => unit) full))
+                           (variant (map (fn ts => variant (map (fn _ => unit) ts)) rfull))),
       OrderBy : list (variant (map (fn _ => unit) full) * bool)}
 
-fun select [chosen :: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen] (fl : folder chosen) =
-    {Select = fn labels =>
+fun select [chosen :: {Type}] [unchosen ::: {Type}] [rts ::: {{Type}}] [chosen ~ unchosen] (fl : folder chosen) =
+    {Select = fn labels _ =>
                  @foldR [fn _ => string] [fn _ => string]
                   (fn [nm ::_] [t ::_] [r ::_] [[nm] ~ r] (l : string) (acc : string) =>
                       if acc = "" then
@@ -219,28 +228,62 @@ fun select [chosen :: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen] (fl : fo
                       else
                           acc ^ "," ^ l)
                   "" fl (labels --- _),
-     Json = fn labels jsons =>
-               @json_record fl (jsons --- _) (labels --- _),
+     Json = fn labels _ jsons _ =>
+               @map2 [fn _ => string] [json] [fn t => string * json t]
+                (fn [t] (l : string) (j : json t) => (l, j))
+                fl (labels --- _) (jsons --- _),
      Where = None,
      OrderBy = []}
 
-fun wher [ts ::: {Type}] [chosen ::: {Type}] (e : exp ts bool) (q : query ts chosen) =
+fun rselect [ts ::: {Type}] [nm :: Name] [rchosen :: {Type}] [runchosen ::: {Type}]
+            [rest ::: {{Type}}] [chosen ::: {Type}]
+            [rchosen ~ runchosen] [[nm] ~ rest] [[nm] ~ chosen]
+            (fl : folder rchosen)
+            (q : query ts ([nm = rchosen ++ runchosen] ++ rest) chosen) =
+    q -- #Select -- #Json
+      ++ {Select = fn labels (rlabels : $(map (fn ts => string * $(map (fn _ => string) ts)) ([nm = rchosen ++ runchosen] ++ rest))) =>
+                      @foldR [fn _ => string] [fn _ => string]
+                       (fn [nm' ::_] [t ::_] [r ::_] [[nm'] ~ r] (l : string) (acc : string) =>
+                           if acc = "" then
+                               l
+                           else
+                               acc ^ "," ^ rlabels.nm.1 ^ "." ^ l)
+                       (q.Select labels rlabels) fl (rlabels.nm.2 --- _),
+          Json = fn labels (rlabels : $(map (fn ts => string * $(map (fn _ => string) ts)) ([nm = rchosen ++ runchosen] ++ rest)))
+                           jsons (rjsons : $(map (fn ts => $(map json ts)) ([nm = rchosen ++ runchosen] ++ rest))) =>
+                    q.Json labels rlabels jsons rjsons
+                           ++ {nm = (rlabels.nm.1,
+                                     @json_record fl (rjsons.nm --- _) (rlabels.nm.2 --- _))}}
+
+fun wher [ts ::: {Type}] [rts ::: {{Type}}] [chosen ::: {Type}] (e : exp ts rts bool) (q : query ts rts chosen) =
     q -- #Where ++ {Where = Some (case q.Where of
                                       None => e
                                     | Some e' => Binop (And, e', e))}
 
-fun orderByAsc [nm :: Name] [t ::: Type] [r ::: {Type}] [chosen ::: {Type}] [[nm] ~ r]
-               (q : query ([nm = t] ++ r) chosen) =
+fun orderByAsc [nm :: Name] [t ::: Type] [r ::: {Type}] [rts ::: {{Type}}] [chosen ::: {Type}] [[nm] ~ r]
+               (q : query ([nm = t] ++ r) rts chosen) =
     q -- #OrderBy ++ {OrderBy = List.append q.OrderBy ((make [nm] (), True) :: [])}
 
-fun orderByDesc [nm :: Name] [t ::: Type] [r ::: {Type}] [chosen ::: {Type}] [[nm] ~ r]
-               (q : query ([nm = t] ++ r) chosen) =
+fun orderByDesc [nm :: Name] [t ::: Type] [r ::: {Type}] [rts ::: {{Type}}] [chosen ::: {Type}] [[nm] ~ r]
+               (q : query ([nm = t] ++ r) rts chosen) =
     q -- #OrderBy ++ {OrderBy = List.append q.OrderBy ((make [nm] (), False) :: [])}
 
-fun vproj [t ::: Type] [r ::: {Unit}] (fl : folder r) (r : $(mapU t r)) (v : variant (mapU unit r)) =
+fun vproj [K] [t ::: Type] [r ::: {K}] (fl : folder r) (r : $(map (fn _ => t) r)) (v : variant (map (fn _ => unit) r)) =
     match v (@Top.mp [fn _ => t] [fn _ => unit -> t]
              (fn [u] v () => v)
              fl r)
+
+fun vproj' [K] [tf ::: K -> Type] [tf' :: K -> Type] [t ::: Type] [r ::: {K}] (fl : folder r) (r : $(map (fn ts => t * tf ts) r)) (v : variant (map tf' r)) =
+    match v (@Top.mp [fn ts => t * tf ts] [fn ts => tf' ts -> t]
+             (fn [u] (v, _) _ => v)
+             fl r)
+    
+fun vproj2 [t1 ::: Type] [t ::: Type] [r ::: {{Type}}] (fl : folder r) (fls : $(map folder r))
+           (r : $(map (fn ts => t1 * $(map (fn _ => t) ts)) r))
+           (v : variant (map (fn ts => variant (map (fn _ => unit) ts)) r)) =
+    match v (@Top.map2 [folder] [fn ts => t1 * $(map (fn _ => t) ts)] [fn ts => variant (map (fn _ => unit) ts) -> t]
+              (fn [ts] fl' (_, r) v => @vproj fl' r v)
+              fl fls r)
     
 functor Make(M : sig
                  val token : transaction (option string)
@@ -324,6 +367,12 @@ functor Make(M : sig
                       val labels : $(map (fn _ => string) fields)
                       val jsons : $(map json fields)
                       val fl : folder fields
+
+                      con relations :: {{Type}}
+                      val rlabels : $(map (fn ts => string * $(map (fn _ => string) ts)) relations)
+                      val rjsons : $(map (fn ts => $(map Json.json ts)) relations)
+                      val rfl : folder relations
+                      val rfls : $(map folder relations)
                   end) = struct
         open N
 
@@ -351,13 +400,17 @@ functor Make(M : sig
                 Eq => False
               | And => True
 
-        val labelOf = @@vproj [string] [map (fn _ => ()) fields]
-                        (@Folder.mp fl) labels
+        val labelOf = @vproj fl labels
+        fun rlabelOf (rf : variant (map (fn ts => variant (map (fn _ => unit) ts)) relations)) =
+            @@vproj' [fn ts => $(map (fn _ => string) ts)] [fn ts => variant (map (fn _ => unit) ts)]
+              [string] [_]
+              rfl rlabels rf ^ "." ^ @vproj2 rfl rfls rlabels rf
 
-        fun formatExp e =
+        fun formatExp (e : exp' fields relations) =
             case e of
                 String s => urlencode ("'" ^ escapeSingleQuotes s ^ "'")
               | Field f => labelOf f
+              | RField rf => rlabelOf rf
               | Binop (b, e1, e2) =>
                 if allowsParens b then
                     "(" ^ formatExp e1 ^ ")"
@@ -371,9 +424,9 @@ functor Make(M : sig
         fun formatOrderBy1 (v, b) =
             labelOf v ^ "+" ^ (if b then "ASC" else "DESC")
 
-        fun formatQuery [chosen] (q : query fields chosen) =
+        fun formatQuery [chosen] (q : query fields relations chosen) =
             let
-                val qu = "SELECT+" ^ q.Select labels ^ "+FROM+" ^ stable
+                val qu = "SELECT+" ^ q.Select labels rlabels ^ "+FROM+" ^ stable
 
                 val qu = case q.Where of
                              None => qu
@@ -389,10 +442,14 @@ functor Make(M : sig
                 qu
             end
              
-        fun query [chosen] inst (q : query fields chosen) =
-            qs <- return (prefix inst ^ "query?q=" ^ @formatQuery q);
-            debug ("Query: " ^ qs);
-            s <- api (bless qs);
-            return (@fromJson (@json_query_results (q.Json labels jsons)) s : query_results $chosen).Records
+        fun query [chosen] (fl : folder chosen) inst (q : query fields relations chosen) =
+            s <- api (bless (prefix inst ^ "query?q=" ^ @formatQuery q));
+            return (@fromJson (@json_query_results (@json_record fl
+                                                     (@mp [fn t => string * json t] [json]
+                                                       (fn [t] (p : string * json t) => p.2)
+                                                       fl (q.Json labels rlabels jsons rjsons))
+                                                     (@mp [fn t => string * json t] [fn _ => string]
+                                                       (fn [t] (p : string * json t) => p.1)
+                                                       fl (q.Json labels rlabels jsons rjsons)))) s : query_results $chosen).Records
     end
 end
