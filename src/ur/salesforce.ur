@@ -112,12 +112,6 @@ type account_id = string
 val read_account_id = _
 val show_account_id = _
 
-type account = {
-     Id : account_id,
-     Nam : account_name,
-     Website : option string
-}
-
 type new_account = {
      Nam : account_name,
      Website : option string
@@ -135,46 +129,6 @@ val _ : json new_contact = json_record_withOptional {FirstName = "FirstName",
                                                      LastName = "LastName"}
                                                     {Account = "AccountId",
                                                      Email = "Email"}
-
-type contact_name = {
-     FirstName : string,
-     LastName : string
-}
-
-type attributes = {
-     Url : string
-}
-val _ : json attributes = json_record {Url = "url"}
-
-type account_query_result = {
-     Attributes : attributes,
-     Nam : account_name,
-     Website : option string
-}
-val _ : json account_query_result = json_record {Nam = "Name", Attributes = "attributes", Website = "Website"}
-                   
-type account_query_results = {
-     Records : list account_query_result
-}
-val _ : json account_query_results = json_record {Records = "records"}
-
-type contact_query_result = {
-     Attributes : attributes,
-     FirstName : string,
-     LastName : string,
-     Account : option account_id,
-     Email : option string
-}
-val _ : json contact_query_result = json_record_withOptional {FirstName = "FirstName",
-                                                              LastName = "LastName",
-                                                              Attributes = "attributes"}
-                                                             {Account = "AccountId",
-                                                              Email = "Email"}
-
-type contact_query_results = {
-     Records : list contact_query_result
-}
-val _ : json contact_query_results = json_record {Records = "records"}
 
 type query_results (r :: Type) = {
      Records : list r
@@ -325,21 +279,6 @@ functor Make(M : sig
     fun record inst id = bless ("https://" ^ inst ^ ".lightning.force.com/lightning/r/" ^ urlencode id ^ "/view")
                       
     structure Accounts = struct
-        fun list inst =
-            s <- api (bless (prefix inst ^ "query?q=SELECT+name,website+from+Account"));
-            return (List.mp addId (fromJson s : account_query_results).Records)
-
-        fun existsByName inst name =
-            s <- api (bless (prefix inst ^ "query?q=SELECT+name,website+from+Account+where+name='" ^ urlencode name ^ "'"));
-            return (List.length (fromJson s : account_query_results).Records = 1)
-
-        fun lookupByName inst name =
-            s <- api (bless (prefix inst ^ "query?q=SELECT+name,website+from+Account+where+name='" ^ urlencode name ^ "'"));
-            case (fromJson s : account_query_results).Records of
-                [] => return None
-              | r :: [] => return (Some (addId r))
-              | _ => error <xml>Multiple records returned from Salesforce account lookup by name</xml>
-
         fun insert inst ac =
             s <- apiPost (bless (prefix inst ^ "sobjects/Account/")) (toJson ac);
             if (fromJson s : response).Success then
@@ -349,10 +288,6 @@ functor Make(M : sig
     end
 
     structure Contacts = struct
-        fun existsByName inst name =
-            s <- api (bless (prefix inst ^ "query?q=SELECT+firstname,+lastname+from+Contact+where+firstname='" ^ urlencode name.FirstName ^ "'+and+lastname='" ^ urlencode name.LastName ^ "'"));
-            return (List.length (fromJson s : contact_query_results).Records = 1)
-
         fun insert inst ct =
             s <- apiPost (bless (prefix inst ^ "sobjects/Contact/")) (toJson ct);
             if (fromJson s : response).Success then

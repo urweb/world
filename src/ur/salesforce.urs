@@ -29,12 +29,6 @@ type account_id
 val read_account_id : read account_id
 val show_account_id : show account_id
 
-type account = {
-     Id : account_id,
-     Nam : account_name,
-     Website : option string
-}
-
 type new_account = {
      Nam : account_name,
      Website : option string
@@ -45,11 +39,6 @@ type new_contact = {
      LastName : string,
      Account : option account_id,
      Email : option string
-}
-
-type contact_name = {
-     FirstName : string,
-     LastName : string
 }
 
 con exp :: {Type} (* direct fields *) -> {{Type}} (* fields via relations *) -> Type -> Type
@@ -81,14 +70,10 @@ functor Make(M : sig
     (* The canonical page to examine a record *)
 
     structure Accounts : sig
-        val list : instance -> transaction (list account)
-        val existsByName : instance -> account_name -> transaction bool
-        val lookupByName : instance -> account_name -> transaction (option account)
         val insert : instance -> new_account -> transaction unit
     end
 
     structure Contacts : sig
-        val existsByName : instance -> contact_name -> transaction bool
         val insert : instance -> new_contact -> transaction unit
     end
 
