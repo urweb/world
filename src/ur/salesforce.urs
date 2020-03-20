@@ -21,26 +21,6 @@ type sfield
 val read_sfield : read sfield
 val show_sfield : show sfield
                            
-type account_name
-val read_account_name : read account_name
-val show_account_name : show account_name
-
-type account_id
-val read_account_id : read account_id
-val show_account_id : show account_id
-
-type new_account = {
-     Nam : account_name,
-     Website : option string
-}
-
-type new_contact = {
-     FirstName : string,
-     LastName : string,
-     Account : option account_id,
-     Email : option string
-}
-
 con exp :: {Type} (* direct fields *) -> {{Type}} (* fields via relations *) -> Type -> Type
 val field : nm :: Name -> t ::: Type -> r ::: {Type} -> rts ::: {{Type}} -> [[nm] ~ r]
             => exp ([nm = t] ++ r) rts t
@@ -63,21 +43,17 @@ val orderByAsc : nm :: Name -> t ::: Type -> r ::: {Type} -> rts ::: {{Type}} ->
 val orderByDesc : nm :: Name -> t ::: Type -> r ::: {Type} -> rts ::: {{Type}} -> chosen ::: {Type} -> [[nm] ~ r]
                   => query ([nm = t] ++ r) rts chosen -> query ([nm = t] ++ r) rts chosen
 
+con values :: {Type} -> Type
+val values : chosen ::: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
+             => folder chosen -> $chosen -> values (chosen ++ unchosen)
+
 functor Make(M : sig
                  val token : transaction (option string)
              end) : sig
     val record : instance -> string (* object ID *) -> url
     (* The canonical page to examine a record *)
 
-    structure Accounts : sig
-        val insert : instance -> new_account -> transaction unit
-    end
-
-    structure Contacts : sig
-        val insert : instance -> new_contact -> transaction unit
-    end
-
-    functor Query(N : sig
+    functor Table(N : sig
                       val stable : stable
                       con fields :: {Type}
                       val labels : $(map (fn _ => string) fields)
@@ -91,5 +67,6 @@ functor Make(M : sig
                       val rfls : $(map folder relations)
                   end) : sig
         val query : chosen ::: {Type} -> folder chosen -> instance -> query N.fields N.relations chosen -> transaction (list $chosen)
+        val insert : instance -> values N.fields -> transaction string
     end
 end

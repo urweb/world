@@ -104,41 +104,20 @@ functor ThreeLegged(M : sig
         </xml>
 end
 
-type account_name = string
-val read_account_name = _
-val show_account_name = _
-
-type account_id = string
-val read_account_id = _
-val show_account_id = _
-
-type new_account = {
-     Nam : account_name,
-     Website : option string
-}
-val _ : json new_account = json_record_withOptional {Nam = "Name"}
-                           {Website = "Website"}
-
-type new_contact = {
-     FirstName : string,
-     LastName : string,
-     Account : option account_id,
-     Email : option string
-}
-val _ : json new_contact = json_record_withOptional {FirstName = "FirstName",
-                                                     LastName = "LastName"}
-                                                    {Account = "AccountId",
-                                                     Email = "Email"}
-
 type query_results (r :: Type) = {
      Records : list r
 }
 fun json_query_results [r] (_ : json r) : json (query_results r) = json_record {Records = "records"}
                                      
-type response = {
-     Success : bool
+type success_response = {
+     Id : string
 }
-val _ : json response = json_record {Success = "success"}
+val _ : json success_response = json_record {Id = "id"}
+
+type error_response = {
+     Message : string
+}
+val _ : json error_response = json_record {Message = "message"}
 
 datatype binop =
          Eq
@@ -239,6 +218,15 @@ fun vproj2 [t1 ::: Type] [t ::: Type] [r ::: {{Type}}] (fl : folder r) (fls : $(
               (fn [ts] fl' (_, r) v => @vproj fl' r v)
               fl fls r)
     
+type values (ts :: {Type}) =
+     $(map (fn _ => string) ts) -> $(map json ts) -> string
+
+fun values [chosen ::: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen]
+           (fl : folder chosen) (r : $chosen)
+           (labels : $(map (fn _ => string) (chosen ++ unchosen)))
+           (jsons : $(map json (chosen ++ unchosen))) =
+  @toJson (@json_record fl (jsons --- _) (labels --- _)) r
+
 functor Make(M : sig
                  val token : transaction (option string)
              end) = struct
@@ -277,26 +265,8 @@ functor Make(M : sig
 
     fun prefix inst = "https://" ^ inst ^ ".salesforce.com/services/data/v47.0/"
     fun record inst id = bless ("https://" ^ inst ^ ".lightning.force.com/lightning/r/" ^ urlencode id ^ "/view")
-                      
-    structure Accounts = struct
-        fun insert inst ac =
-            s <- apiPost (bless (prefix inst ^ "sobjects/Account/")) (toJson ac);
-            if (fromJson s : response).Success then
-                return ()
-            else
-                error <xml>Salesforce account insert failed.</xml>
-    end
 
-    structure Contacts = struct
-        fun insert inst ct =
-            s <- apiPost (bless (prefix inst ^ "sobjects/Contact/")) (toJson ct);
-            if (fromJson s : response).Success then
-                return ()
-            else
-                error <xml>Salesforce contact insert failed.</xml>
-    end
-
-    functor Query(N : sig
+    functor Table(N : sig
                       val stable : stable
                       con fields :: {Type}
                       val labels : $(map (fn _ => string) fields)
@@ -386,5 +356,11 @@ functor Make(M : sig
                                                      (@mp [fn t => string * json t] [fn _ => string]
                                                        (fn [t] (p : string * json t) => p.1)
                                                        fl (q.Json labels rlabels jsons rjsons)))) s : query_results $chosen).Records
+
+        fun insert inst vs =
+            s <- apiPost (bless (prefix inst ^ "sobjects/" ^ stable ^ "/")) (vs labels jsons);
+            case String.sindex {Needle = "\"message\"", Haystack = s} of
+                None => return (fromJson s : success_response).Id
+              | Some _ => error <xml>Salesforce {[stable]} insert failed: {[(fromJson s : error_response).Message]}</xml>
     end
 end
