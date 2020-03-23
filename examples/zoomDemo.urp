@@ -3,7 +3,7 @@ rewrite all ZoomDemo/*
 database dbname=zoomDemo
 sql zoomDemo.sql
 safeGetDefault
-allow url https://api.zoom.us/*
+allow url https://*
 
 zoomSecrets
 zoomDemo

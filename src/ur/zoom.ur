@@ -184,6 +184,39 @@ val _ : json (list string) = json_derived
                                      unparse x
                                  end)
 
+datatype global_dial_in_type =
+         Toll
+       | Tollfree
+val _ : json global_dial_in_type = json_derived
+                                   (fn x =>
+                                       case x of
+                                           "toll" => Toll
+                                         | "tollfree" => Tollfree
+                                         | _ => error <xml>Bad Zoom global-dial-in type {[x]}</xml>)
+                                   (fn x =>
+                                       case x of
+                                           Toll => "toll"
+                                         | Tollfree => "tollfree")
+
+type global_dial_in_number = {
+     Country : string,
+     CountryName : string,
+     City : string,
+     Number : string,
+     Typ : global_dial_in_type
+}
+val _ : json global_dial_in_number = json_record {Country = "country",
+                                                  CountryName = "country_name",
+                                                  City = "city",
+                                                  Number = "number",
+                                                  Typ = "type"}
+
+type global_dial_in_country = {
+     CountryName : string
+}
+val _ : json global_dial_in_country = json_derived (fn s => {CountryName = s})
+                                                   (fn r => r.CountryName)
+
 type meeting_settings = {
      HostVideo : option bool,
      ParticipantVideo : option bool,
@@ -191,6 +224,7 @@ type meeting_settings = {
      InMeeting : option bool,
      JoinBeforeHost : option bool,
      MuteUponEntry : option bool,
+     Watermark : option bool,
      UsePmi : option bool,
      ApprovalType : option approval_type,
      RegistrationType : option registration_type,
@@ -201,9 +235,11 @@ type meeting_settings = {
      AlternativeHosts : option (list string),
      CloseRegistration : option bool,
      WaitingRoom : option bool,
-     GlobalDialInCountries : option (list string),
+     GlobalDialInCountries : option (list global_dial_in_country),
+     GlobalDialInNumbers : option (list global_dial_in_number),
      ContactName : option string,
      ContactEmail : option string,
+     RegistrantsConfirmationEmail : option bool,
      RegistrantsEmailNotification : option bool,
      MeetingAuthentication : option bool,
      AuthenticationOption : option string,
@@ -217,6 +253,7 @@ val _ : json meeting_settings = json_record_withOptional
                                      InMeeting = "in_meeting",
                                      JoinBeforeHost = "join_before_host",
                                      MuteUponEntry = "mute_upon_entry",
+                                     Watermark = "watermark",
                                      UsePmi = "use_pmi",
                                      ApprovalType = "approval_type",
                                      RegistrationType = "registration_type",
@@ -228,25 +265,48 @@ val _ : json meeting_settings = json_record_withOptional
                                      CloseRegistration = "close_registration",
                                      WaitingRoom = "waiting_room",
                                      GlobalDialInCountries = "global_dial_in_countries",
+                                     GlobalDialInNumbers = "global_dial_in_numbers",
                                      ContactName = "contact_name",
                                      ContactEmail = "contact_email",
+                                     RegistrantsConfirmationEmail = "registrants_confirmation_email",
                                      RegistrantsEmailNotification = "registrants_email_notification",
                                      MeetingAuthentication = "meeting_authentication",
                                      AuthenticationOption = "authentication_option",
                                      AuthenticationDomains = "authentication_domains"}
          
+datatype meeting_status =
+         Waiting
+       | Started
+       | Finished
+val _ : json meeting_status = json_derived
+                                  (fn x =>
+                                      case x of
+                                          "waiting" => Waiting
+                                        | "started" => Started
+                                        | "finished" => Finished
+                                        | _ => error <xml>Bad Zoom meeting status {[x]}</xml>)
+                                  (fn x =>
+                                      case x of
+                                          Waiting => "waiting"
+                                        | Started => "started"
+                                        | Finished => "finished")
+
 type meeting = {
      Uuid : option string,
      Id : option int,
      HostId : option string,
      Topic : string,
      Typ : meeting_type,
+     Status : option meeting_status,
      StartTime : option time,
      Duration : option int,
      Timezone : option string,
      Password : option string,
+     H323Password : option string,
+     Pmi : option int,
      Agenda : option string,
      CreatedAt : option time,
+     StartUrl : option string,
      JoinUrl : option string,
      Recurrence : option recurrence,
      Settings : option meeting_settings
@@ -257,12 +317,16 @@ val _ : json meeting = json_record_withOptional
                            {Uuid = "uuid",
                             Id = "id",
                             HostId = "host_id",
+                            Status = "status",
                             StartTime = "start_time",
                             Duration = "duration",
                             Timezone = "timezone",
                             Password = "password",
+                            H323Password = "h323_password",
+                            Pmi = "pmi",
                             Agenda = "agenda",
                             CreatedAt = "created_at",
+                            StartUrl = "start_url",
                             JoinUrl = "join_url",
                             Recurrence = "recurrence",
                             Settings = "settings"}
@@ -271,23 +335,120 @@ type meetings_response = {
      Meetings : list meeting
 }
 val _ : json meetings_response = json_record {Meetings = "meetings"}
-    
-type room = {
-     Id : string,
-     Nam : string,
-     ActivationCode : string,
-     Status : string
-}
-val _ : json room = json_record {Id = "id",
-                                 Nam = "name",
-                                 ActivationCode = "activation_code",
-                                 Status = "status"}
-                 
-type rooms_response = {
-     Rooms : list room
-}
-val _ : json rooms_response = json_record {Rooms = "rooms"}
 
+datatype file_type =
+         MP4
+       | M4A
+       | TIMELINE
+       | TRANSCRIPT
+       | CHAT
+       | CC
+val _ : json file_type = json_derived
+                             (fn x =>
+                                 case x of
+                                     "MP4" => MP4
+                                   | "M4A" => M4A
+                                   | "TIMELINE" => TIMELINE
+                                   | "TRANSCRIPT" => TRANSCRIPT
+                                   | "CHAT" => CHAT
+                                   | "CC" => CC
+                                   | _ => error <xml>Bad Zoom file type {[x]}</xml>)
+                             (fn x =>
+                                 case x of
+                                     MP4 => "MP4"
+                                   | M4A => "M4A"
+                                   | TIMELINE => "TIMELINE"
+                                   | TRANSCRIPT => "TRANSCRIPT"
+                                   | CHAT => "CHAT"
+                                   | CC => "CC")
+         
+datatype recording_type =
+         SharedScreenWithSpeakerViewCC
+       | SharedScreenWithSpeakerView
+       | SharedScreenWithGalleryView
+       | SpeakerView
+       | GalleryView
+       | SharedScreen
+       | AudioOnly
+       | AudioTranscript
+       | ChatFile
+       | Timeline
+val _ : json recording_type = json_derived
+                                  (fn x =>
+                                      case x of
+                                          "shared_screen_with_speaker_view(CC)" => SharedScreenWithSpeakerViewCC
+                                        | "shared_screen_with_speaker_view" => SharedScreenWithSpeakerView
+                                        | "shared_screen_with_gallery_view" => SharedScreenWithGalleryView
+                                        | "speaker_view" => SpeakerView
+                                        | "gallery_view" => GalleryView
+                                        | "shared_screen" => SharedScreen
+                                        | "audio_only" => AudioOnly
+                                        | "audio_transcript" => AudioTranscript
+                                        | "chat_file" => ChatFile
+                                        | "TIMELINE" => Timeline
+                                        | _ => error <xml>Bad Zoom recording type {[x]}</xml>)
+                                  (fn x =>
+                                      case x of
+                                          SharedScreenWithSpeakerViewCC => "shared_screen_with_speaker_view(CC)"
+                                        | SharedScreenWithSpeakerView => "shared_screen_with_speaker_view"
+                                        | SharedScreenWithGalleryView => "shared_screen_with_gallery_view"
+                                        | SpeakerView => "speaker_view"
+                                        | GalleryView => "gallery_view"
+                                        | SharedScreen => "shared_screen"
+                                        | AudioOnly => "audio_only"
+                                        | AudioTranscript => "audio_transcript"
+                                        | ChatFile => "chat_file"
+                                        | Timeline => "TIMELINE")
+         
+type recording_file = {
+     Id : option string,
+     MeetingId : option string,
+     RecordingStart : option time,
+     RecordingEnd : option time,
+     FileType : option file_type,
+     FileSize : option int,
+     PlayUrl : option string,
+     DownloadUrl : option string,
+     Status : option string,
+     DeletedTime : option time,
+     RecordingType : option recording_type
+}
+val _ : json recording_file = json_record_withOptional {}
+                              {Id = "id",
+                               MeetingId = "meeting_id",
+                               RecordingStart = "recording_start",
+                               RecordingEnd = "recording_end",
+                               FileType = "file_type",
+                               FileSize = "file_size",
+                               PlayUrl = "play_url",
+                               DownloadUrl = "download_url",
+                               Status = "status",
+                               DeletedTime = "deleted_time",
+                               RecordingType = "recording_type"}
+                      
+type recording = {
+     Uuid : option string,
+     Id : option int,
+     AccountId : option string,
+     HostId : option string,
+     Topic : string,
+     StartTime : option time,
+     Duration : option int,
+     TotalSize : option int,
+     ShareUrl : option string,
+     RecordingFiles : option (list recording_file)
+}
+val _ : json recording = json_record_withOptional {Topic = "topic"}
+                         {Uuid = "uuid",
+                          Id = "id",
+                          AccountId = "account_id",
+                          HostId = "host_id",
+                          StartTime = "start_time",
+                          Duration = "duration",
+                          TotalSize = "total_size",
+                          ShareUrl = "share_url",
+                          RecordingFiles = "recording_files"}
+                 
 functor Make(M : AUTH) = struct
     open M
 
@@ -315,12 +476,16 @@ functor Make(M : AUTH) = struct
         fun create x =
             s <- apiPost "users/me/meetings" (toJson x);
             return (fromJson s)
+
+        fun get x =
+            s <- api ("meetings/" ^ show x);
+            return (fromJson s)
     end
 
-    structure Rooms = struct
-        val list =
-            s <- api "rooms";
-            return (fromJson s : rooms_response).Rooms
+    structure CloudRecordings = struct
+        fun get x =
+            s <- api ("meetings/" ^ show x ^ "/recordings");
+            return (fromJson s)
     end
 end
 

@@ -58,6 +58,22 @@ datatype auto_recording =
        | Cloud
        | NoRecording
 
+datatype global_dial_in_type =
+         Toll
+       | Tollfree
+         
+type global_dial_in_number = {
+     Country : string,
+     CountryName : string,
+     City : string,
+     Number : string,
+     Typ : global_dial_in_type
+}
+
+type global_dial_in_country = {
+     CountryName : string
+}
+
 type meeting_settings = {
      HostVideo : option bool,
      ParticipantVideo : option bool,
@@ -65,6 +81,7 @@ type meeting_settings = {
      InMeeting : option bool,
      JoinBeforeHost : option bool,
      MuteUponEntry : option bool,
+     Watermark : option bool,
      UsePmi : option bool,
      ApprovalType : option approval_type,
      RegistrationType : option registration_type,
@@ -75,46 +92,98 @@ type meeting_settings = {
      AlternativeHosts : option (list string),
      CloseRegistration : option bool,
      WaitingRoom : option bool,
-     GlobalDialInCountries : option (list string),
+     GlobalDialInCountries : option (list global_dial_in_country),
+     GlobalDialInNumbers : option (list global_dial_in_number),
      ContactName : option string,
      ContactEmail : option string,
+     RegistrantsConfirmationEmail : option bool,
      RegistrantsEmailNotification : option bool,
      MeetingAuthentication : option bool,
      AuthenticationOption : option string,
      AuthenticationDomains : option (list string)
 }
-         
+
+datatype meeting_status =
+         Waiting
+       | Started
+       | Finished
+                        
 type meeting = {
      Uuid : option string,
      Id : option int,
      HostId : option string,
      Topic : string,
      Typ : meeting_type,
+     Status : option meeting_status,
      StartTime : option time,
      Duration : option int,
      Timezone : option string,
      Password : option string,
+     H323Password : option string,
+     Pmi : option int,
      Agenda : option string,
      CreatedAt : option time,
+     StartUrl : option string,
      JoinUrl : option string,
      Recurrence : option recurrence,
      Settings : option meeting_settings
 }
 
-type room = {
-     Id : string,
-     Nam : string,
-     ActivationCode : string,
-     Status : string
+datatype file_type =
+         MP4
+       | M4A
+       | TIMELINE
+       | TRANSCRIPT
+       | CHAT
+       | CC
+
+datatype recording_type =
+         SharedScreenWithSpeakerViewCC
+       | SharedScreenWithSpeakerView
+       | SharedScreenWithGalleryView
+       | SpeakerView
+       | GalleryView
+       | SharedScreen
+       | AudioOnly
+       | AudioTranscript
+       | ChatFile
+       | Timeline
+
+type recording_file = {
+     Id : option string,
+     MeetingId : option string,
+     RecordingStart : option time,
+     RecordingEnd : option time,
+     FileType : option file_type,
+     FileSize : option int,
+     PlayUrl : option string,
+     DownloadUrl : option string,
+     Status : option string,
+     DeletedTime : option time,
+     RecordingType : option recording_type
 }
+               
+type recording = {
+     Uuid : option string,
+     Id : option int,
+     AccountId : option string,
+     HostId : option string,
+     Topic : string,
+     StartTime : option time,
+     Duration : option int,
+     TotalSize : option int,
+     ShareUrl : option string,
+     RecordingFiles : option (list recording_file)
+}     
 
 functor Make(M : AUTH) : sig
     structure Meetings : sig
         val list : transaction (list meeting)
         val create : meeting -> transaction meeting
+        val get : int (* ID *) -> transaction meeting
     end
 
-    structure Rooms : sig
-        val list : transaction (list room)
+    structure CloudRecordings : sig
+        val get : int (* meeting ID *) -> transaction recording
     end
 end
