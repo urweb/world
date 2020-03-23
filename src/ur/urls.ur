@@ -51,3 +51,75 @@ fun urldecode s =
     in
         loop s ""
     end
+
+fun base64url_encode' (getChar : int -> char) (len : int) =
+    let
+        fun char n =
+            String.str (Char.fromInt (if n < 0 then
+                                          error <xml>Negative character to base64 encode</xml>
+                                      else if n < 26 then
+                                          Char.toInt #"A" + n
+                                      else if n < 52 then
+                                          Char.toInt #"a" + (n - 26)
+                                      else if n < 62 then
+                                          Char.toInt #"0" + (n - 52)
+                                      else if n = 62 then
+                                          Char.toInt #"-"
+                                      else if n = 63 then
+                                          Char.toInt #"_"
+                                      else
+                                          error <xml>Invalid base64 digit</xml>))
+
+        fun ch j =
+            let
+                val n = Char.toInt (getChar j)
+            in
+                if n < 0 then
+                    n + 256
+                else
+                    n
+            end
+
+        fun bytes i acc =
+            if i >= len then
+                acc
+            else if i = len - 1 then
+                let
+                    val n = ch i * 16
+                in
+                    acc
+                    ^ char (n / 64)
+                    ^ char (n % 64)
+                    ^ "=="
+                end
+            else if i = len - 2 then
+                let
+                    val n1 = ch i
+                    val n2 = ch (i + 1)
+                    val n = n1 * (256 * 4) + n2 * 4
+                in
+                    acc
+                    ^ char (n / (64 * 64))
+                    ^ char (n / 64 % 64)
+                    ^ char (n % 64)
+                    ^ "="
+                end
+            else
+                let
+                    val n1 = ch i
+                    val n2 = ch (i + 1)
+                    val n3 = ch (i + 2)
+                    val n = n1 * (256 * 256) + n2 * 256 + n3
+                in
+                    bytes (i + 3) (acc
+                                   ^ char (n / (64 * 64 * 64))
+                                   ^ char (n / (64 * 64) % 64)
+                                   ^ char (n / 64 % 64)
+                                   ^ char (n % 64))
+                end
+    in
+        bytes 0 ""
+    end
+
+fun base64url_encode s = base64url_encode' (String.sub s) (String.length s)
+fun base64url_encode_signature s = base64url_encode' (WorldFfi.byte s) (WorldFfi.length s)

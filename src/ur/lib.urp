@@ -9,9 +9,12 @@ $/json
 $/monad
 $/option
 $/list
+$/datetime
+api
 urls
 oauth
 clearbit
 github
 google
 salesforce
+zoom

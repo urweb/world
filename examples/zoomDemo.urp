@@ -1,0 +1,9 @@
+library ../src/ur
+rewrite all ZoomDemo/*
+database dbname=zoomDemo
+sql zoomDemo.sql
+safeGetDefault
+allow url https://api.zoom.us/*
+
+zoomSecrets
+zoomDemo

@@ -8,6 +8,7 @@
 #include <openssl/sha.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
+#include <openssl/hmac.h>
 
 #include <urweb.h>
 #include <world.h>
@@ -201,7 +202,7 @@ uw_Basis_char uw_WorldFfi_byte(uw_context ctx, uw_WorldFfi_signatur sig, uw_Basi
   return sig.bytes[i];
 }
 
-uw_WorldFfi_signatur uw_WorldFfi_sign(uw_context ctx, uw_Basis_string key, uw_Basis_string message) {
+uw_WorldFfi_signatur uw_WorldFfi_sign_rs256(uw_context ctx, uw_Basis_string key, uw_Basis_string message) {
   unsigned char digest[SHA256_DIGEST_LENGTH];
   uw_WorldFfi_signatur sig;
 
@@ -238,5 +239,17 @@ uw_WorldFfi_signatur uw_WorldFfi_sign(uw_context ctx, uw_Basis_string key, uw_Ba
   }
 
   RSA_free(rsa);
+  return sig;
+}
+
+uw_WorldFfi_signatur uw_WorldFfi_sign_hs256(uw_context ctx, uw_Basis_string key, uw_Basis_string message) {
+  uw_WorldFfi_signatur sig;
+
+  const EVP_MD *md = EVP_sha256();
+  sig.bytes = uw_malloc(ctx, EVP_MD_meth_get_result_size(md));
+  if (!HMAC(md, key, strlen(key), (unsigned char *)message, strlen(message),
+            (unsigned char *)sig.bytes, (unsigned int *)&sig.len))
+    uw_error(ctx, FATAL, "World: HMAC failed");
+
   return sig;
 }

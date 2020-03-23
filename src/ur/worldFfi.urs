@@ -9,6 +9,9 @@ type signatur
 val length : signatur -> int
 val byte : signatur -> int -> char
 
-val sign : string (* key, in PEM format *)
-           -> string (* message to sign *)
-           -> signatur
+val sign_rs256 : string (* key, in PEM format *)
+                 -> string (* message to sign *)
+                 -> signatur
+val sign_hs256 : string (* key, in PEM format *)
+                 -> string (* message to sign *)
+                 -> signatur
