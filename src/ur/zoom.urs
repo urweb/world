@@ -136,6 +136,7 @@ datatype file_type =
        | TRANSCRIPT
        | CHAT
        | CC
+       | NoTypeYet
 
 datatype recording_type =
          SharedScreenWithSpeakerViewCC
@@ -149,20 +150,24 @@ datatype recording_type =
        | ChatFile
        | Timeline
 
+datatype recording_status =
+         Processing
+       | Completed
+         
 type recording_file = {
      Id : option string,
      MeetingId : option string,
      RecordingStart : option time,
-     RecordingEnd : option time,
+     RecordingEnd : option string,
      FileType : option file_type,
      FileSize : option int,
      PlayUrl : option string,
      DownloadUrl : option string,
-     Status : option string,
+     Status : option recording_status,
      DeletedTime : option time,
      RecordingType : option recording_type
 }
-               
+                      
 type recording = {
      Uuid : option string,
      Id : option int,
@@ -174,7 +179,7 @@ type recording = {
      TotalSize : option int,
      ShareUrl : option string,
      RecordingFiles : option (list recording_file)
-}     
+}
 
 functor Make(M : AUTH) : sig
     structure Meetings : sig
@@ -184,6 +189,7 @@ functor Make(M : AUTH) : sig
     end
 
     structure CloudRecordings : sig
+        val list : transaction (list recording)
         val get : int (* meeting ID *) -> transaction recording
     end
 end

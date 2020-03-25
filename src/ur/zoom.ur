@@ -343,6 +343,7 @@ datatype file_type =
        | TRANSCRIPT
        | CHAT
        | CC
+       | NoTypeYet
 val _ : json file_type = json_derived
                              (fn x =>
                                  case x of
@@ -352,6 +353,7 @@ val _ : json file_type = json_derived
                                    | "TRANSCRIPT" => TRANSCRIPT
                                    | "CHAT" => CHAT
                                    | "CC" => CC
+                                   | "" => NoTypeYet
                                    | _ => error <xml>Bad Zoom file type {[x]}</xml>)
                              (fn x =>
                                  case x of
@@ -360,7 +362,8 @@ val _ : json file_type = json_derived
                                    | TIMELINE => "TIMELINE"
                                    | TRANSCRIPT => "TRANSCRIPT"
                                    | CHAT => "CHAT"
-                                   | CC => "CC")
+                                   | CC => "CC"
+                                   | NoTypeYet => "")
          
 datatype recording_type =
          SharedScreenWithSpeakerViewCC
@@ -400,16 +403,30 @@ val _ : json recording_type = json_derived
                                         | ChatFile => "chat_file"
                                         | Timeline => "TIMELINE")
          
+datatype recording_status =
+         Processing
+       | Completed
+val _ : json recording_status = json_derived
+                                (fn x =>
+                                    case x of
+                                        "processing" => Processing
+                                      | "completed" => Completed
+                                      | _ => error <xml>Bad Zoom recording status {[x]}</xml>)
+                                (fn x =>
+                                    case x of
+                                        Processing => "processing"
+                                      | Completed => "completed")
+
 type recording_file = {
      Id : option string,
      MeetingId : option string,
      RecordingStart : option time,
-     RecordingEnd : option time,
+     RecordingEnd : option string,
      FileType : option file_type,
      FileSize : option int,
      PlayUrl : option string,
      DownloadUrl : option string,
-     Status : option string,
+     Status : option recording_status,
      DeletedTime : option time,
      RecordingType : option recording_type
 }
@@ -448,7 +465,12 @@ val _ : json recording = json_record_withOptional {Topic = "topic"}
                           TotalSize = "total_size",
                           ShareUrl = "share_url",
                           RecordingFiles = "recording_files"}
-                 
+
+type recordings_response = {
+    Meetings : list recording
+}
+val _ : json recordings_response = json_record {Meetings = "meetings"}
+                         
 functor Make(M : AUTH) = struct
     open M
 
@@ -475,6 +497,7 @@ functor Make(M : AUTH) = struct
 
         fun create x =
             s <- apiPost "users/me/meetings" (toJson x);
+            debug ("Create: " ^ s);
             return (fromJson s)
 
         fun get x =
@@ -483,6 +506,11 @@ functor Make(M : AUTH) = struct
     end
 
     structure CloudRecordings = struct
+        val list =
+            s <- api "users/me/recordings";
+            debug ("Recordings: " ^ s);
+            return (fromJson s : recordings_response).Meetings
+
         fun get x =
             s <- api ("meetings/" ^ show x ^ "/recordings");
             return (fromJson s)
