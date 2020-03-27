@@ -467,7 +467,6 @@ functor Make(M : AUTH) = struct
                 Some addr => return (Some addr)
               | None =>
                 s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses") (Some ("Bearer " ^ tok)) False;
-                debug ("Response: " ^ s);
                 case (fromJson s : profile).EmailAddresses of
                     [] => error <xml>No e-mail addresses in Google profile.</xml>
                   | {Value = addr} :: _ =>
