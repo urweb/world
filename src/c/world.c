@@ -51,7 +51,8 @@ uw_Basis_int uw_WorldFfi_lastErrorCode(uw_context ctx) {
   else return 200;
 }
 
-static void doweb(uw_context ctx, uw_buffer *buf, CURL *c, uw_Basis_string url, int encode_errors) {
+// Returns 1 on "not found".
+static int doweb(uw_context ctx, uw_buffer *buf, CURL *c, uw_Basis_string url, int encode_errors, int special_case_404) {
   if (strncmp(url, "https://", 8))
     uw_error(ctx, FATAL, "World: URL is not HTTPS");
 
@@ -78,22 +79,28 @@ static void doweb(uw_context ctx, uw_buffer *buf, CURL *c, uw_Basis_string url, 
       curl_free(message);
     } else
       uw_error(ctx, FATAL, "Error fetching URL: %s", error_buffer);
+    return 0;
   } else {
     long http_code;
     curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &http_code);
     uw_set_global(ctx, "world.lastErrorCode", (void *)http_code, NULL);
 
-    if (http_code == 200 || http_code == 201 || http_code == 204)
+    if (http_code == 200 || http_code == 201 || http_code == 204) {
       uw_buffer_append(buf, "", 1);
-    else if (encode_errors) {
+      return 0;
+    } else if (special_case_404 && http_code == 404) {
+      return 1;
+    } else if (encode_errors) {
       uw_buffer_reset(buf);
       uw_buffer_append(buf, server_failure, sizeof server_failure - 1);
       char *message = curl_easy_escape(c, error_buffer, 0);
       uw_buffer_append(buf, message, strlen(message));
       curl_free(message);
+      return 0;
     } else {
       uw_buffer_append(buf, "", 1);
       uw_error(ctx, FATAL, "Error response #%d from remote server: %s", http_code, buf->start);
+      return 0;
     }
   } 
 }
@@ -142,7 +149,7 @@ static uw_Basis_string nonget(const char *verb, uw_context ctx, uw_Basis_string 
   curl_easy_setopt(c, CURLOPT_HTTPHEADER, slist);
   uw_push_cleanup(ctx, (void (*)(void *))curl_slist_free_all, slist);
 
-  doweb(ctx, &buf, c, url, 0);
+  (void)doweb(ctx, &buf, c, url, 0, 0);
   uw_set_global(ctx, "world.lastUrl", strdup(url), free);
   uw_set_global(ctx, "world.lastVerb", strdup(verb ? verb : ""), free);
   uw_set_global(ctx, "world.lastBody", strdup(body ? body : ""), free);
@@ -185,11 +192,41 @@ uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_st
   curl_easy_setopt(c, CURLOPT_HTTPHEADER, slist);
   uw_push_cleanup(ctx, (void (*)(void *))curl_slist_free_all, slist);
  
-  doweb(ctx, &buf, c, url, encode_errors);
+  (void)doweb(ctx, &buf, c, url, encode_errors, 0);
   uw_Basis_string ret = uw_strdup(ctx, buf.start);
   uw_pop_cleanup(ctx);
   uw_pop_cleanup(ctx);
 
+  return ret;
+}
+
+uw_Basis_string uw_WorldFfi_getOpt(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_bool encode_errors) {
+  uw_buffer buf;
+  CURL *c = curl(ctx);
+  uw_Basis_string ret;
+  
+  curl_easy_reset(c);
+
+  struct curl_slist *slist = NULL;
+  slist = curl_slist_append(slist, "User-Agent: Ur/Web World library");
+
+  if (auth) {
+    uw_Basis_string header = uw_Basis_strcat(ctx, "Authorization: ", auth);
+    slist = curl_slist_append(slist, header);
+  }
+
+  if (slist == NULL)
+    uw_error(ctx, FATAL, "Can't append to libcurl slist");
+
+  curl_easy_setopt(c, CURLOPT_HTTPHEADER, slist);
+  uw_push_cleanup(ctx, (void (*)(void *))curl_slist_free_all, slist);
+ 
+  if (doweb(ctx, &buf, c, url, encode_errors, 1))
+    ret = NULL;
+  else
+    ret = uw_strdup(ctx, buf.start);
+  uw_pop_cleanup(ctx);
+  uw_pop_cleanup(ctx);
   return ret;
 }
 

@@ -1,4 +1,5 @@
 val get : url -> option string (* auth header *) -> bool (* return normally on errors, with server's error messages? *) -> transaction string
+val getOpt : url -> option string (* auth header *) -> bool (* return normally on errors, with server's error messages? *) -> transaction (option string) (* [None] on 404 HTTP code *)
 val post : url -> option string (* auth header *) -> option string (* body Content-type *) -> string (* body *) -> transaction string
 val put : url -> option string (* auth header *) -> option string (* body Content-type *) -> string (* body *) -> transaction string
 val delete : url -> option string (* auth header *) -> transaction string

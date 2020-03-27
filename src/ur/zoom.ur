@@ -486,6 +486,10 @@ functor Make(M : AUTH) = struct
         tok <- token;
         WorldFfi.get (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False
 
+    fun apiOpt url =
+        tok <- token;
+        WorldFfi.getOpt (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False
+
     fun apiPost url body =
         tok <- token;
         WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) (Some "application/json") body
@@ -497,23 +501,21 @@ functor Make(M : AUTH) = struct
 
         fun create x =
             s <- apiPost "users/me/meetings" (toJson x);
-            debug ("Create: " ^ s);
             return (fromJson s)
 
         fun get x =
-            s <- api ("meetings/" ^ show x);
-            return (fromJson s)
+            so <- apiOpt ("meetings/" ^ show x);
+            return (Option.mp fromJson so)
     end
 
     structure CloudRecordings = struct
         val list =
             s <- api "users/me/recordings";
-            debug ("Recordings: " ^ s);
             return (fromJson s : recordings_response).Meetings
 
         fun get x =
-            s <- api ("meetings/" ^ show x ^ "/recordings");
-            return (fromJson s)
+            so <- apiOpt ("meetings/" ^ show x ^ "/recordings");
+            return (Option.mp fromJson so)
     end
 end
 

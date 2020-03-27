@@ -185,11 +185,11 @@ functor Make(M : AUTH) : sig
     structure Meetings : sig
         val list : transaction (list meeting)
         val create : meeting -> transaction meeting
-        val get : int (* ID *) -> transaction meeting
+        val get : int (* ID *) -> transaction (option meeting)
     end
 
     structure CloudRecordings : sig
         val list : transaction (list recording)
-        val get : int (* meeting ID *) -> transaction recording
+        val get : int (* meeting ID *) -> transaction (option recording)
     end
 end
