@@ -1,24 +1,58 @@
-signature S = sig
-    val client_id : string
-    val client_secret : string
-    val https : bool
+(* Which permissions may we ask for, limiting what the app may do thereafter? *)
+structure Scope : sig
+    type t
+    val empty : t
+    val union : t -> t -> t
+    val readonly : t -> bool
+
+    val calendar : t
+    val calendar_readonly : t
+    val calendar_admin : t
+    val gmail_readonly : t
+
+    (* SUPER-COUNTERINTUITIVE FACT TO REMEMBER: to make domain-wide delegation
+     * work properly (as is needed for two-legged authentication with
+     * impersonation), the service account must be granted use of
+     * [calendar_admin], not just whatever scopes you would use for normal
+     * calendar access! *)
 end
 
-signature SS = sig
-    val service_account : string
-    val private_key : string
-    val impersonated_user : string
-    val https : bool
+(* Two authentication methods are supported, each providing this signature. *)
+
+signature AUTH = sig
+    val readonly : bool
+    val token : transaction (option string)
 end
 
-(* First service: merely verifying which Google user we are dealing with *)
-functor Login(M : S) : sig
+(* Two-legged is when the app is authorized to act directly, not on behalf of
+ * any user. *)
+functor TwoLegged(M : sig
+                      val service_account : string
+                      val private_key : string
+                      val impersonated_user : string
+                      val https : bool
+
+                      val scopes : Scope.t
+                  end) : AUTH
+
+(* Three-legged is when the app always asks a user for delegated privileges,
+ * via OAuth 2. *)
+functor ThreeLegged(M : sig
+                        val client_id : string
+                        val client_secret : string
+                        val https : bool
+
+                        val scopes : Scope.t
+                    end) : sig
+    include AUTH
+
+    val status : transaction xbody
     val authorize : { ReturnTo : url } -> transaction page
-    val whoami : transaction (option string)
-    (* ^-- Warning: returns an opaque numeric ID, not an e-mail address!
-     * Google's API docs encourage use of this ID to prepare for e-mail changes by users. *)
+    val loggedIn : transaction bool
     val logout : transaction unit
 end
+
+(** * Gmail types *)
 
 type message_id
 val show_message_id : show message_id
@@ -62,18 +96,7 @@ type message_metadata = {
      SizeEstimate : int
 }
 
-functor Gmail(M : S) : sig
-    val authorize : { ReturnTo : url } -> transaction page
-    val logout : transaction unit
-    val loggedIn : transaction bool
-    val emailAddress : transaction string (* ...of the logged-in user *)
-                 
-    val messages : transaction (list message)
-    val messageMetadata : message_id -> transaction message_metadata
-    val history : history_id -> transaction (list message * option history_id (* use for next call *))
-
-    val ofThread : thread_id -> transaction url (* user-specific URL to a thread on Gmail *)
-end
+(** * Calendar types *)
 
 type calendar_id
 val show_calendar_id : show calendar_id
@@ -135,38 +158,30 @@ datatype updatesMode =
        | ExternalOnly
        | NoneUpdates
 
-signature CALENDAR_AUTH = sig
-    val readonly : bool
-    val token : transaction (option string)
-end
-         
-functor Calendar(M : CALENDAR_AUTH) : sig
-    structure Calendars : sig
-       val list : transaction (list calendar)
+
+(** * The main API interface *)
+                        
+functor Make(M : AUTH) : sig
+    val emailAddress : transaction (option string)
+
+    structure Gmail : sig
+        val messages : transaction (list message)
+        val messageMetadata : message_id -> transaction message_metadata
+        val history : history_id -> transaction (list message * option history_id (* use for next call *))
+
+        val ofThread : thread_id -> transaction url (* user-specific URL to a thread on Gmail *)
     end
 
-    structure Events : sig
-        val list : calendar_id -> {Min : option time, Max : option time} -> transaction (list event)
-        val insert : calendar_id -> {SendUpdates : option updatesMode} -> newEvent -> transaction event
-        val update : calendar_id -> event -> transaction event
-        val delete : calendar_id -> event_id -> transaction unit
+    structure Calendar : sig
+        structure Calendars : sig
+            val list : transaction (list calendar)
+        end
+
+        structure Events : sig
+            val list : calendar_id -> {Min : option time, Max : option time} -> transaction (list event)
+            val insert : calendar_id -> {SendUpdates : option updatesMode} -> newEvent -> transaction event
+            val update : calendar_id -> event -> transaction event
+            val delete : calendar_id -> event_id -> transaction unit
+        end
     end
 end
-
-functor CalendarThreeLegged(M : sig
-                                include S
-                                val readonly : bool
-                            end) : sig
-    include CALENDAR_AUTH
-    val status : transaction xbody
-end
-
-(* SUPER-COUNTERINTUITIVE FACT TO REMEMBER: to make domain-wide delegation work
- * properly (as is needed for two-legged authentication with impersonation), the
- * service account must be granted use of the scope
- * https://www.googleapis.com/auth/admin.directory.resource.calendar , not just
- * whatever scopes you would use for normal calendar access! *)
-functor CalendarTwoLegged(M : sig
-                              include SS
-                              val readonly : bool
-                          end) : CALENDAR_AUTH

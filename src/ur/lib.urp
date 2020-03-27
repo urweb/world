@@ -13,6 +13,7 @@ $/datetime
 api
 urls
 oauth
+scopes
 clearbit
 github
 google

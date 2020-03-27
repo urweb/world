@@ -145,6 +145,6 @@ functor Make(M : S) = struct
                              ^ "&response_type=code"
                              ^ (case scope of
                                     None => ""
-                                  | Some scope => "&scope=" ^ scope)))
+                                  | Some scope => "&scope=" ^ urlencode scope)))
         end
 end
