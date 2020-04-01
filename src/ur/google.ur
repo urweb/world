@@ -474,6 +474,8 @@ functor Make(M : AUTH) = struct
                     [] => error <xml>No e-mail addresses in Google profile.</xml>
                   | {Value = addr} :: _ =>
                     tm <- now;
+                    dml (DELETE FROM tokensToEmails
+                         WHERE Token = {[tok]});
                     dml (INSERT INTO tokensToEmails(Token, Email, Expires)
                          VALUES ({[tok]}, {[addr]}, {[addSeconds tm (60 * 60)]}));
                     return (Some addr)
@@ -489,6 +491,8 @@ functor Make(M : AUTH) = struct
                 [] => error <xml>No e-mail addresses in Google profile.</xml>
               | {Value = addr} :: _ =>
                 tm <- now;
+                dml (DELETE FROM tokensToEmails
+                     WHERE Token = {[tok]});
                 dml (INSERT INTO tokensToEmails(Token, Email, Expires)
                      VALUES ({[tok]}, {[addr]}, {[addSeconds tm (60 * 60)]}));
                 return (Some {EmailAddress = addr,
