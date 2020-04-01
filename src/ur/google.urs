@@ -163,6 +163,7 @@ datatype updatesMode =
                         
 functor Make(M : AUTH) : sig
     val emailAddress : transaction (option string)
+    val profile : transaction (option {EmailAddress : string, DisplayName : option string})
 
     structure Gmail : sig
         val messages : transaction (list message)

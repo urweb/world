@@ -183,10 +183,10 @@ functor ThreeLegged(M : sig
         return <xml>
           <dyn signal={liV <- signal li;
                        if liV then
-                           return <xml><button value="Log out of Google Calendar"
+                           return <xml><button value="Log out of Google"
                                                onclick={fn _ => rpc logout; set li False}/></xml>
                        else
-                           return <xml><button value="Log into Google Calendar"
+                           return <xml><button value="Log into Google"
                                                onclick={fn _ => redirect (url (auth (show cur)))}/></xml>}/>
         </xml>
 end
@@ -196,10 +196,13 @@ end
 type email_address = { Value : string }
 val _ : json email_address = json_record {Value = "value"}
 
-type profile = { EmailAddresses : list email_address }
+type name = { DisplayName : string }
+val _ : json name = json_record {DisplayName = "displayName"}
 
-val json_profile : json profile =
-    json_record {EmailAddresses = "emailAddresses"}
+type profile = { EmailAddresses : list email_address,
+                 Names : option (list name) }
+val _ : json profile = json_record_withOptional {EmailAddresses = "emailAddresses"}
+                                                {Names = "names"}
 
 (** * Gmail types *)
 
@@ -474,6 +477,24 @@ functor Make(M : AUTH) = struct
                     dml (INSERT INTO tokensToEmails(Token, Email, Expires)
                          VALUES ({[tok]}, {[addr]}, {[addSeconds tm (60 * 60)]}));
                     return (Some addr)
+
+    val profile =
+        toko <- M.token;
+        case toko of
+            None => return None
+          | Some tok =>
+            s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses,names") (Some ("Bearer " ^ tok)) False;
+            p <- return (fromJson s : profile);
+            case p.EmailAddresses of
+                [] => error <xml>No e-mail addresses in Google profile.</xml>
+              | {Value = addr} :: _ =>
+                tm <- now;
+                dml (INSERT INTO tokensToEmails(Token, Email, Expires)
+                     VALUES ({[tok]}, {[addr]}, {[addSeconds tm (60 * 60)]}));
+                return (Some {EmailAddress = addr,
+                              DisplayName = case p.Names of
+                                                Some ({DisplayName = n} :: _) => Some n
+                                              | _ => None})
 
     fun api svc url =
         tok <- token;
