@@ -450,6 +450,7 @@ functor Make(M : AUTH) = struct
 
     table tokensToEmails : { Token : string,
                              Email : string,
+                             DisplayName : option string,
                              Expires : time }
       PRIMARY KEY Token
 
@@ -474,8 +475,8 @@ functor Make(M : AUTH) = struct
                     [] => error <xml>No e-mail addresses in Google profile.</xml>
                   | {Value = addr} :: _ =>
                     tm <- now;
-                    dml (INSERT INTO tokensToEmails(Token, Email, Expires)
-                         VALUES ({[tok]}, {[addr]}, {[addSeconds tm (60 * 60)]}));
+                    dml (INSERT INTO tokensToEmails(Token, Email, DisplayName, Expires)
+                         VALUES ({[tok]}, {[addr]}, NULL, {[addSeconds tm (60 * 60)]}));
                     return (Some addr)
 
     val profile =
@@ -483,15 +484,25 @@ functor Make(M : AUTH) = struct
         case toko of
             None => return None
           | Some tok =>
-            s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses,names") (Some ("Bearer " ^ tok)) False;
-            p <- return (fromJson s : profile);
-            case p.EmailAddresses of
-                [] => error <xml>No e-mail addresses in Google profile.</xml>
-              | {Value = addr} :: _ =>
-                return (Some {EmailAddress = addr,
-                              DisplayName = case p.Names of
-                                                Some ({DisplayName = n} :: _) => Some n
-                                              | _ => None})
+            ro <- oneOrNoRows1 (SELECT tokensToEmails.Email, tokensToEmails.DisplayName
+                                FROM tokensToEmails
+                                WHERE tokensToEmails.Token = {[tok]});
+            case ro of
+                Some r => return (Some {EmailAddress = r.Email, DisplayName = r.DisplayName})
+              | None =>
+                s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses,names") (Some ("Bearer " ^ tok)) False;
+                p <- return (fromJson s : profile);
+                case p.EmailAddresses of
+                    [] => error <xml>No e-mail addresses in Google profile.</xml>
+                  | {Value = addr} :: _ =>
+                    tm <- now;
+                    dname <- return (case p.Names of
+                                         Some ({DisplayName = n} :: _) => Some n
+                                       | _ => None);
+                    dml (INSERT INTO tokensToEmails(Token, Email, DisplayName, Expires)
+                         VALUES ({[tok]}, {[addr]}, {[dname]}, {[addSeconds tm (60 * 60)]}));
+                    return (Some {EmailAddress = addr,
+                                  DisplayName = dname})
 
     fun api svc url =
         tok <- token;
