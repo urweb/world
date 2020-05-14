@@ -12,21 +12,21 @@ val _ : json status = json_derived
                                   "inprogress" => Inprogress
                                 | "withdrawn" => Withdrawn
                                 | "submitted" => Submitted
-                                | "accepted" => Accepted
-                                | "rejected" => Rejected
+                                | "Accepted" => Accepted
+                                | "Rejected" => Rejected
                                 | _ => error <xml>Bad HotCRP paper status {[x]}</xml>)
                           (fn x =>
                               case x of
                                   Inprogress => "inprogress"
                                 | Withdrawn => "withdrawn"
                                 | Submitted => "submitted"
-                                | Accepted => "accepted"
-                                | Rejected => "rejected")
+                                | Accepted => "Accepted"
+                                | Rejected => "Rejected")
 
 val _ : json time = json_derived
                         (addSeconds minTime)
                         toSeconds
-                      
+
 type author = {
      Email : string,
      First : option string,
@@ -52,7 +52,7 @@ val json_submission : Json.json submission =
                  Hash = "hash",
                  Timestamp = "timestamp",
                  Size = "size"}
-              
+
 type paper = {
      Pid : int,
      Title : string,
