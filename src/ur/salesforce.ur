@@ -11,7 +11,7 @@ val sread = mkRead' (fn s =>
                             Some s
                         else
                             None)
-                    
+
 type stable = string
 val read_stable = sread "Salesforce SObject table"
 val show_stable = _
@@ -26,6 +26,8 @@ functor ThreeLegged(M : sig
 
                         val client_id : string
                         val client_secret : string
+
+                        val onCompletion : transaction page
                     end) = struct
     open M
 
@@ -53,7 +55,7 @@ functor ThreeLegged(M : sig
 
     open Oauth.Make(struct
                         open M
-                        
+
                         val url_base = "https://" ^ (if sandbox then "test." else "login.") ^ "salesforce.com/services/oauth2/"
                         val authorize_url = bless (url_base ^ "authorize")
                         val access_token_url = bless (url_base ^ "token")
@@ -86,9 +88,6 @@ functor ThreeLegged(M : sig
                 return (tm < exp)
     val logout = clearCookie user
 
-    fun auth url =
-        authorize {ReturnTo = bless url}
-
     val status =
         li <- loggedIn;
         li <- source li;
@@ -100,7 +99,7 @@ functor ThreeLegged(M : sig
                                                onclick={fn _ => rpc logout; set li False}/></xml>
                        else
                            return <xml><button value="Log into Salesforce"
-                                               onclick={fn _ => redirect (url (auth (show cur)))}/></xml>}/>
+                                               onclick={fn _ => redirect (url authorize)}/></xml>}/>
         </xml>
 end
 
@@ -108,7 +107,7 @@ type query_results (r :: Type) = {
      Records : list r
 }
 fun json_query_results [r] (_ : json r) : json (query_results r) = json_record {Records = "records"}
-                                     
+
 type success_response = {
      Id : string
 }

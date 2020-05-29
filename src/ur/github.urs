@@ -14,10 +14,11 @@ signature S = sig
     val client_id : string
     val client_secret : string
     val https : bool
+    val onCompletion : transaction page
 end
 
 functor Make(M : S) : sig
-    val authorize : { ReturnTo : url } -> transaction page
+    val authorize : transaction page
     val whoami : transaction (option string)
     val trackUser : string -> transaction unit
     val logout : transaction unit

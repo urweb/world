@@ -8,6 +8,8 @@ functor ThreeLegged(M : sig
 
                         val https : bool
                         val sandbox : bool
+
+                        val onCompletion : transaction page
                     end) : sig
     val token : transaction (option string)
     val status : transaction xbody
@@ -20,7 +22,7 @@ val show_stable : show stable
 type sfield
 val read_sfield : read sfield
 val show_sfield : show sfield
-                           
+
 con exp :: {Type} (* direct fields *) -> {{Type}} (* fields via relations *) -> Type -> Type
 val field : nm :: Name -> t ::: Type -> r ::: {Type} -> rts ::: {{Type}} -> [[nm] ~ r]
             => exp ([nm = t] ++ r) rts t

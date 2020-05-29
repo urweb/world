@@ -43,11 +43,12 @@ functor ThreeLegged(M : sig
                         val https : bool
 
                         val scopes : Scope.t
+                        val onCompletion : transaction page
                     end) : sig
     include AUTH
 
     val status : transaction xbody
-    val authorize : { ReturnTo : url } -> transaction page
+    val authorize : transaction page
     val loggedIn : transaction bool
     val logout : transaction unit
 end

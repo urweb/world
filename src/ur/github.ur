@@ -30,6 +30,7 @@ signature S = sig
     val client_id : string
     val client_secret : string
     val https : bool
+    val onCompletion : transaction page
 end
 
 type profile = { Login : string,
@@ -141,5 +142,4 @@ functor Make(M : S) = struct
              Monad.ignore (updateProfile (bless ("https://api.github.com/users/" ^ login)) None)
 
     val logout = clearCookie user
-             
 end

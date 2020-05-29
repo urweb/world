@@ -110,6 +110,7 @@ functor ThreeLegged(M : sig
                         val https : bool
 
                         val scopes : Scope.t
+                        val onCompletion : transaction page
                     end) = struct
     open M
 
@@ -173,9 +174,6 @@ functor ThreeLegged(M : sig
                            WHERE secrets.Secret = {[n]}
                              AND secrets.Expires > CURRENT_TIMESTAMP)
 
-    fun auth url =
-        authorize {ReturnTo = bless url}
-
     val status =
         li <- loggedIn;
         li <- source li;
@@ -187,7 +185,7 @@ functor ThreeLegged(M : sig
                                                onclick={fn _ => rpc logout; set li False}/></xml>
                        else
                            return <xml><button value="Log into Google"
-                                               onclick={fn _ => redirect (url (auth (show cur)))}/></xml>}/>
+                                               onclick={fn _ => redirect (url authorize)}/></xml>}/>
         </xml>
 end
 

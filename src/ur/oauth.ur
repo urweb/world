@@ -10,6 +10,7 @@ signature S = sig
     val scope : option string
 
     val withToken : {Token : string, Expiration : option int} -> transaction unit
+    val onCompletion : transaction page
 end
 
 table states : { State : int, Expires : time }
@@ -33,9 +34,9 @@ val _ : json error_response = json_record {Error = "error_description"}
 functor Make(M : S) = struct
     open M
 
-    fun authorize {ReturnTo = rt} =
+    val authorize =
         let
-            fun authorized rt (qs : option queryString) =
+            fun authorized (qs : option queryString) =
                 case qs of
                     None => error <xml>No query string in OAuth authorization response</xml>
                   | Some qs =>
@@ -125,13 +126,13 @@ functor Make(M : S) = struct
                                                  ^ "&client_secret=" ^ urlencode client_secret
                                                  ^ "&code=" ^ urlencode code
                                                  ^ "&grant_type=authorization_code"
-                                                 ^ "&redirect_uri=" ^ urlencode (show (effectfulUrl (authorized (show rt)))));
+                                                 ^ "&redirect_uri=" ^ urlencode (show (effectfulUrl authorized)));
                             (token, expiry) <- return (parse2 pb);
                             case token of
                                 Error msg => error <xml>OAuth error: {[msg]}</xml>
                               | Token token =>
                                 withToken {Token = token, Expiration = expiry};
-                                redirect (bless rt)
+                                onCompletion
                     end
         in
             state <- rand;
@@ -140,7 +141,7 @@ functor Make(M : S) = struct
 
             redirect (bless (show authorize_url
                              ^ "?client_id=" ^ urlencode client_id
-                             ^ "&redirect_uri=" ^ urlencode (show (effectfulUrl (authorized (show rt))))
+                             ^ "&redirect_uri=" ^ urlencode (show (effectfulUrl authorized))
                              ^ "&state=" ^ show state
                              ^ "&response_type=code"
                              ^ (case scope of
