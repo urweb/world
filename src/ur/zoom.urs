@@ -6,7 +6,7 @@ end
 signature AUTH = sig
     val token : transaction (option string)
 end
-              
+
 functor TwoLegged(M : S) : AUTH
 
 datatype meeting_type =
@@ -61,7 +61,7 @@ datatype auto_recording =
 datatype global_dial_in_type =
          Toll
        | Tollfree
-         
+
 type global_dial_in_number = {
      Country : string,
      CountryName : string,
@@ -107,7 +107,7 @@ datatype meeting_status =
          Waiting
        | Started
        | Finished
-                        
+
 type meeting = {
      Uuid : option string,
      Id : option int,
@@ -127,6 +127,60 @@ type meeting = {
      JoinUrl : option string,
      Recurrence : option recurrence,
      Settings : option meeting_settings
+}
+
+datatype webinar_type =
+         Webinar
+       | WebinarRecurringUnfixed
+       | WebinarRecurringFixed
+
+type webinar_settings = {
+     HostVideo : option bool,
+     PanelistsVideo : option bool,
+     PracticeSession : option bool,
+     HdVideo : option bool,
+     ApprovalType : option approval_type,
+     RegistrationType : option registration_type,
+     Audio : option audio,
+     AutoRecording : option auto_recording,
+     EnforceLogin : option bool,
+     EnforceLoginDomains : option (list string),
+     AlternativeHosts : option (list string),
+     CloseRegistration : option bool,
+     ShowShareButton : option bool,
+     AllowMultipleDevices : option bool,
+     OnDemand : option bool,
+     GlobalDialInCountries : option (list global_dial_in_country),
+     ContactName : option string,
+     ContactEmail : option string,
+     RegistrantsConfirmationEmail : option bool,
+     RegistrantsRestrictNumber : option int,
+     NotifyRegistrantgs : option bool,
+     PostWebinarSurvey : option bool,
+     SurveyUrl : option string,
+     RegistrantsEmailNotification : option bool,
+     MeetingAuthentication : option bool,
+     AuthenticationOption : option string,
+     AuthenticationDomains : option (list string),
+     AuthenticationName : option string
+}
+
+type webinar = {
+     Uuid : option string,
+     Id : option int,
+     HostId : option string,
+     Topic : string,
+     Typ : webinar_type,
+     StartTime : option time,
+     Duration : option int,
+     Timezone : option string,
+     Password : option string,
+     Agenda : option string,
+     CreatedAt : option time,
+     StartUrl : option string,
+     JoinUrl : option string,
+     Recurrence : option recurrence,
+     Settings : option webinar_settings
 }
 
 datatype file_type =
@@ -153,7 +207,7 @@ datatype recording_type =
 datatype recording_status =
          Processing
        | Completed
-         
+
 type recording_file = {
      Id : option string,
      MeetingId : option string,
@@ -167,7 +221,7 @@ type recording_file = {
      DeletedTime : option time,
      RecordingType : option recording_type
 }
-                      
+
 type recording = {
      Uuid : option string,
      Id : option int,
@@ -186,6 +240,12 @@ functor Make(M : AUTH) : sig
         val list : transaction (list meeting)
         val create : meeting -> transaction meeting
         val get : int (* ID *) -> transaction (option meeting)
+    end
+
+    structure Webinars : sig
+        val list : transaction (list webinar)
+        val create : webinar -> transaction webinar
+        val get : int (* ID *) -> transaction (option webinar)
     end
 
     structure CloudRecordings : sig

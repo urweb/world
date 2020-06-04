@@ -273,7 +273,7 @@ val _ : json meeting_settings = json_record_withOptional
                                      MeetingAuthentication = "meeting_authentication",
                                      AuthenticationOption = "authentication_option",
                                      AuthenticationDomains = "authentication_domains"}
-         
+
 datatype meeting_status =
          Waiting
        | Started
@@ -336,6 +336,121 @@ type meetings_response = {
 }
 val _ : json meetings_response = json_record {Meetings = "meetings"}
 
+datatype webinar_type =
+         Webinar
+       | WebinarRecurringUnfixed
+       | WebinarRecurringFixed
+val _ : json webinar_type = json_derived
+                                (fn x =>
+                                    case x of
+                                        5 => Webinar
+                                      | 6 => WebinarRecurringUnfixed
+                                      | 9 => WebinarRecurringFixed
+                                      | _ => error <xml>Bad Zoom webinar status {[x]}</xml>)
+                                (fn x =>
+                                    case x of
+                                        Webinar => 5
+                                      | WebinarRecurringUnfixed => 6
+                                      | WebinarRecurringFixed => 9)
+
+type webinar_settings = {
+     HostVideo : option bool,
+     PanelistsVideo : option bool,
+     PracticeSession : option bool,
+     HdVideo : option bool,
+     ApprovalType : option approval_type,
+     RegistrationType : option registration_type,
+     Audio : option audio,
+     AutoRecording : option auto_recording,
+     EnforceLogin : option bool,
+     EnforceLoginDomains : option (list string),
+     AlternativeHosts : option (list string),
+     CloseRegistration : option bool,
+     ShowShareButton : option bool,
+     AllowMultipleDevices : option bool,
+     OnDemand : option bool,
+     GlobalDialInCountries : option (list global_dial_in_country),
+     ContactName : option string,
+     ContactEmail : option string,
+     RegistrantsConfirmationEmail : option bool,
+     RegistrantsRestrictNumber : option int,
+     NotifyRegistrantgs : option bool,
+     PostWebinarSurvey : option bool,
+     SurveyUrl : option string,
+     RegistrantsEmailNotification : option bool,
+     MeetingAuthentication : option bool,
+     AuthenticationOption : option string,
+     AuthenticationDomains : option (list string),
+     AuthenticationName : option string
+}
+val _ : json webinar_settings = json_record_withOptional {}
+                                {HostVideo = "host_video",
+                                 PanelistsVideo = "panelists_video",
+                                 PracticeSession = "practice_session",
+                                 HdVideo = "hd_video",
+                                 ApprovalType = "approval_type",
+                                 RegistrationType = "registration_type",
+                                 Audio = "audio",
+                                 AutoRecording = "auto_recording",
+                                 EnforceLogin = "enforce_login",
+                                 EnforceLoginDomains = "enforce_login_domains",
+                                 AlternativeHosts = "alternative_hosts",
+                                 CloseRegistration = "close_registration",
+                                 ShowShareButton = "show_share_button",
+                                 AllowMultipleDevices = "allow_multiple_devices",
+                                 OnDemand = "on_demand",
+                                 GlobalDialInCountries = "global_dial_in_countries",
+                                 ContactName = "contact_name",
+                                 ContactEmail = "contact_email",
+                                 RegistrantsConfirmationEmail = "registrants_confirmation_email",
+                                 RegistrantsRestrictNumber = "registrants_restrict_number",
+                                 NotifyRegistrantgs = "notify_registrants",
+                                 PostWebinarSurvey = "post_webinar_survey",
+                                 SurveyUrl = "survey_url",
+                                 RegistrantsEmailNotification = "registrants_email_notification",
+                                 MeetingAuthentication = "meeting_authentication",
+                                 AuthenticationOption = "authentication_option",
+                                 AuthenticationDomains = "authentication_domains",
+                                 AuthenticationName = "authentication_name"}
+
+type webinar = {
+     Uuid : option string,
+     Id : option int,
+     HostId : option string,
+     Topic : string,
+     Typ : webinar_type,
+     StartTime : option time,
+     Duration : option int,
+     Timezone : option string,
+     Password : option string,
+     Agenda : option string,
+     CreatedAt : option time,
+     StartUrl : option string,
+     JoinUrl : option string,
+     Recurrence : option recurrence,
+     Settings : option webinar_settings
+}
+val _ : json webinar = json_record_withOptional {Topic = "topic",
+                                                 Typ = "type"}
+                       {Uuid = "uuid",
+                        Id = "id",
+                        HostId = "host_id",
+                        StartTime = "start_time",
+                        Duration = "duration",
+                        Timezone = "timezone",
+                        Password = "password",
+                        Agenda = "agenda",
+                        CreatedAt = "created_at",
+                        StartUrl = "start_url",
+                        JoinUrl = "join_url",
+                        Recurrence = "recurrence",
+                        Settings = "settings"}
+
+type webinars_response = {
+     Webinars : list webinar
+}
+val _ : json webinars_response = json_record {Webinars = "webinars"}
+
 datatype file_type =
          MP4
        | M4A
@@ -364,7 +479,7 @@ val _ : json file_type = json_derived
                                    | CHAT => "CHAT"
                                    | CC => "CC"
                                    | NoTypeYet => "")
-         
+
 datatype recording_type =
          SharedScreenWithSpeakerViewCC
        | SharedScreenWithSpeakerView
@@ -402,7 +517,7 @@ val _ : json recording_type = json_derived
                                         | AudioTranscript => "audio_transcript"
                                         | ChatFile => "chat_file"
                                         | Timeline => "TIMELINE")
-         
+
 datatype recording_status =
          Processing
        | Completed
@@ -442,7 +557,7 @@ val _ : json recording_file = json_record_withOptional {}
                                Status = "status",
                                DeletedTime = "deleted_time",
                                RecordingType = "recording_type"}
-                      
+
 type recording = {
      Uuid : option string,
      Id : option int,
@@ -470,7 +585,7 @@ type recordings_response = {
     Meetings : list recording
 }
 val _ : json recordings_response = json_record {Meetings = "meetings"}
-                         
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -481,7 +596,7 @@ functor Make(M : AUTH) = struct
           | Some tok => return tok
 
     val prefix = "https://api.zoom.us/v2/"
-                        
+
     fun api url =
         tok <- token;
         WorldFfi.get (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False
@@ -505,6 +620,20 @@ functor Make(M : AUTH) = struct
 
         fun get x =
             so <- apiOpt ("meetings/" ^ show x);
+            return (Option.mp fromJson so)
+    end
+
+    structure Webinars = struct
+        val list =
+            s <- api "users/me/webinars";
+            return (fromJson s : webinars_response).Webinars
+
+        fun create x =
+            s <- apiPost "users/me/webinars" (toJson x);
+            return (fromJson s)
+
+        fun get x =
+            so <- apiOpt ("webinars/" ^ show x);
             return (Option.mp fromJson so)
     end
 
