@@ -235,6 +235,34 @@ type recording = {
      RecordingFiles : option (list recording_file)
 }
 
+datatype registrant_status =
+         Approved
+       | Pending
+       | Denied
+
+type registrant = {
+     Id : option string,
+     Email : string,
+     FirstName : string,
+     LastName : option string,
+     Address : option string,
+     City : option string,
+     Country : option string,
+     Zip : option string,
+     State : option string,
+     Phone : option string,
+     Industry : option string,
+     Org : option string,
+     JobTitle : option string,
+     PurchasingTimeFrame : option string,
+     RoleInPurchaseProcess : option string,
+     NoOfEmployees : option string,
+     Comments : option string,
+     Status : option registrant_status,
+     CreateTime : option time,
+     JoinUrl : option string
+}
+
 functor Make(M : AUTH) : sig
     structure Meetings : sig
         val list : transaction (list meeting)
@@ -246,6 +274,11 @@ functor Make(M : AUTH) : sig
         val list : transaction (list webinar)
         val create : webinar -> transaction webinar
         val get : int (* ID *) -> transaction (option webinar)
+
+        structure Registrants : sig
+            val list : int (* Webinar ID *) -> transaction (list registrant)
+            val absentees : string (* Webinar UUID *) -> transaction (list registrant)
+        end
     end
 
     structure CloudRecordings : sig

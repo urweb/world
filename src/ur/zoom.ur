@@ -586,6 +586,71 @@ type recordings_response = {
 }
 val _ : json recordings_response = json_record {Meetings = "meetings"}
 
+datatype registrant_status =
+         Approved
+       | Pending
+       | Denied
+val _ : json registrant_status = json_derived
+                                     (fn x =>
+                                         case x of
+                                             "approved" => Approved
+                                           | "pending" => Pending
+                                           | "denied" => Denied
+                                           | _ => error <xml>Bad Zoom registrant status {[x]}</xml>)
+                                     (fn x =>
+                                         case x of
+                                             Approved => "approved"
+                                           | Pending => "pending"
+                                           | Denied => "denied")
+
+type registrant = {
+     Id : option string,
+     Email : string,
+     FirstName : string,
+     LastName : option string,
+     Address : option string,
+     City : option string,
+     Country : option string,
+     Zip : option string,
+     State : option string,
+     Phone : option string,
+     Industry : option string,
+     Org : option string,
+     JobTitle : option string,
+     PurchasingTimeFrame : option string,
+     RoleInPurchaseProcess : option string,
+     NoOfEmployees : option string,
+     Comments : option string,
+     Status : option registrant_status,
+     CreateTime : option time,
+     JoinUrl : option string
+}
+val _ : json registrant = json_record_withOptional {Email = "email",
+                                                    FirstName = "first_name"}
+                          {Id = "id",
+                           LastName = "last_name",
+                           Address = "address",
+                           City = "city",
+                           Country = "country",
+                           Zip = "zip",
+                           State = "state",
+                           Phone = "phone",
+                           Industry = "industry",
+                           Org = "org",
+                           JobTitle = "job_title",
+                           PurchasingTimeFrame = "purchasing_time_frame",
+                           RoleInPurchaseProcess = "role_in_purchase_process",
+                           NoOfEmployees = "no_of_employees",
+                           Comments = "comments",
+                           Status = "status",
+                           CreateTime = "create_time",
+                           JoinUrl = "join_url"}
+
+type registrants_response = {
+    Registrants : list registrant
+}
+val _ : json registrants_response = json_record {Registrants = "registrants"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -635,6 +700,16 @@ functor Make(M : AUTH) = struct
         fun get x =
             so <- apiOpt ("webinars/" ^ show x);
             return (Option.mp fromJson so)
+
+        structure Registrants = struct
+            fun list x =
+                s <- api ("webinars/" ^ show x ^ "/registrants");
+                return (fromJson s : registrants_response).Registrants
+
+            fun absentees x =
+                s <- api ("past_webinars/" ^ Urls.urlencode x ^ "/absentees");
+                return (fromJson s : registrants_response).Registrants
+        end
     end
 
     structure CloudRecordings = struct
