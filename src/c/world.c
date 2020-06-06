@@ -172,6 +172,10 @@ uw_Basis_string uw_WorldFfi_delete(uw_context ctx, uw_Basis_string url, uw_Basis
   return nonget("DELETE", ctx, url, auth, NULL, NULL);
 }
 
+uw_Basis_string uw_WorldFfi_patch(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_string bodyContentType, uw_Basis_string body) {
+  return nonget("PATCH", ctx, url, auth, bodyContentType, body);
+}
+
 uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_bool encode_errors) {
   uw_buffer buf;
   CURL *c = curl(ctx);

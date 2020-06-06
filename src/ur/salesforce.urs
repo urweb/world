@@ -58,6 +58,7 @@ functor Make(M : sig
     functor Table(N : sig
                       val stable : stable
                       con fields :: {Type}
+                      constraint [Id] ~ fields
                       val labels : $(map (fn _ => string) fields)
                       val jsons : $(map Json.json fields)
                       val fl : folder fields
@@ -68,7 +69,10 @@ functor Make(M : sig
                       val rfl : folder relations
                       val rfls : $(map folder relations)
                   end) : sig
-        val query : chosen ::: {Type} -> folder chosen -> instance -> query N.fields N.relations chosen -> transaction (list $chosen)
-        val insert : instance -> values N.fields -> transaction string
+        con fields' = [Id = string] ++ N.fields
+
+        val query : chosen ::: {Type} -> folder chosen -> instance -> query fields' N.relations chosen -> transaction (list $chosen)
+        val insert : instance -> values fields' -> transaction string (* object ID *)
+        val update : instance -> string (* object ID *) -> values fields' -> transaction unit
     end
 end

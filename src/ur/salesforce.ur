@@ -209,14 +209,14 @@ fun vproj' [K] [tf ::: K -> Type] [tf' :: K -> Type] [t ::: Type] [r ::: {K}] (f
     match v (@Top.mp [fn ts => t * tf ts] [fn ts => tf' ts -> t]
              (fn [u] (v, _) _ => v)
              fl r)
-    
+
 fun vproj2 [t1 ::: Type] [t ::: Type] [r ::: {{Type}}] (fl : folder r) (fls : $(map folder r))
            (r : $(map (fn ts => t1 * $(map (fn _ => t) ts)) r))
            (v : variant (map (fn ts => variant (map (fn _ => unit) ts)) r)) =
     match v (@Top.map2 [folder] [fn ts => t1 * $(map (fn _ => t) ts)] [fn ts => variant (map (fn _ => unit) ts) -> t]
               (fn [ts] fl' (_, r) v => @vproj fl' r v)
               fl fls r)
-    
+
 type values (ts :: {Type}) =
      $(map (fn _ => string) ts) -> $(map json ts) -> string
 
@@ -236,7 +236,7 @@ functor Make(M : sig
         case toko of
             None => error <xml>You must be logged into Salesforce to use this feature.</xml>
           | Some tok => return tok
-         
+
     fun api url =
         tok <- token;
         WorldFfi.get url (Some ("Bearer " ^ tok)) False
@@ -244,6 +244,10 @@ functor Make(M : sig
     fun apiPost url body =
         tok <- token;
         WorldFfi.post url (Some ("Bearer " ^ tok)) (Some "application/json") body
+
+    fun apiPatch url body =
+        tok <- token;
+        WorldFfi.patch url (Some ("Bearer " ^ tok)) (Some "application/json") body
 
     fun idFromUrl url =
         let
@@ -268,6 +272,7 @@ functor Make(M : sig
     functor Table(N : sig
                       val stable : stable
                       con fields :: {Type}
+                      constraint [Id] ~ fields
                       val labels : $(map (fn _ => string) fields)
                       val jsons : $(map json fields)
                       val fl : folder fields
@@ -279,6 +284,8 @@ functor Make(M : sig
                       val rfls : $(map folder relations)
                   end) = struct
         open N
+
+        con fields' = [Id = string] ++ fields
 
         fun escapeSingleQuotes s =
             case s of
@@ -304,13 +311,16 @@ functor Make(M : sig
                 Eq => False
               | And => True
 
-        val labelOf = @vproj fl labels
+        val labels = {Id = "Id"} ++ labels
+        val jsons = {Id = _} ++ jsons
+        val fl' : folder fields' = @Folder.cons [#Id] [_] ! fl
+        val labelOf = @vproj fl' labels
         fun rlabelOf (rf : variant (map (fn ts => variant (map (fn _ => unit) ts)) relations)) =
             @@vproj' [fn ts => $(map (fn _ => string) ts)] [fn ts => variant (map (fn _ => unit) ts)]
               [string] [_]
               rfl rlabels rf ^ "." ^ @vproj2 rfl rfls rlabels rf
 
-        fun formatExp (e : exp' fields relations) =
+        fun formatExp (e : exp' fields' relations) =
             case e of
                 String s => urlencode ("'" ^ escapeSingleQuotes s ^ "'")
               | Field f => labelOf f
@@ -328,7 +338,7 @@ functor Make(M : sig
         fun formatOrderBy1 (v, b) =
             labelOf v ^ "+" ^ (if b then "ASC" else "DESC")
 
-        fun formatQuery [chosen] (q : query fields relations chosen) =
+        fun formatQuery [chosen] (q : query fields' relations chosen) =
             let
                 val qu = "SELECT+" ^ q.Select labels rlabels ^ "+FROM+" ^ stable
 
@@ -345,8 +355,8 @@ functor Make(M : sig
             in
                 qu
             end
-             
-        fun query [chosen] (fl : folder chosen) inst (q : query fields relations chosen) =
+
+        fun query [chosen] (fl : folder chosen) inst (q : query fields' relations chosen) =
             s <- api (bless (prefix inst ^ "query?q=" ^ @formatQuery q));
             return (@fromJson (@json_query_results (@json_record fl
                                                      (@mp [fn t => string * json t] [json]
@@ -361,5 +371,11 @@ functor Make(M : sig
             case String.sindex {Needle = "\"message\"", Haystack = s} of
                 None => return (fromJson s : success_response).Id
               | Some _ => error <xml>Salesforce {[stable]} insert failed: {[(fromJson s : error_response).Message]}</xml>
+
+        fun update inst id vs =
+            s <- apiPatch (bless (prefix inst ^ "sobjects/" ^ stable ^ "/" ^ Urls.urlencode id)) (vs labels jsons);
+            case String.sindex {Needle = "\"message\"", Haystack = s} of
+                None => return ()
+              | Some _ => error <xml>Salesforce {[stable]} update failed: {[(fromJson s : error_response).Message]}</xml>
     end
 end

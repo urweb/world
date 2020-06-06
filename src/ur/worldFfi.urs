@@ -3,6 +3,7 @@ val getOpt : url -> option string (* auth header *) -> bool (* return normally o
 val post : url -> option string (* auth header *) -> option string (* body Content-type *) -> string (* body *) -> transaction string
 val put : url -> option string (* auth header *) -> option string (* body Content-type *) -> string (* body *) -> transaction string
 val delete : url -> option string (* auth header *) -> transaction string
+val patch : url -> option string (* auth header *) -> option string (* body Content-type *) -> string (* body *) -> transaction string
 
 val lastErrorCode : transaction int (* last HTTP code returned by server *)
 
