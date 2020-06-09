@@ -179,6 +179,7 @@ type webinar = {
      CreatedAt : option time,
      StartUrl : option string,
      JoinUrl : option string,
+     RegistrationUrl : option string,
      Recurrence : option recurrence,
      Settings : option webinar_settings
 }

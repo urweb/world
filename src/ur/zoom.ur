@@ -427,6 +427,7 @@ type webinar = {
      CreatedAt : option time,
      StartUrl : option string,
      JoinUrl : option string,
+     RegistrationUrl : option string,
      Recurrence : option recurrence,
      Settings : option webinar_settings
 }
@@ -443,6 +444,7 @@ val _ : json webinar = json_record_withOptional {Topic = "topic",
                         CreatedAt = "created_at",
                         StartUrl = "start_url",
                         JoinUrl = "join_url",
+                        RegistrationUrl = "registration_url",
                         Recurrence = "recurrence",
                         Settings = "settings"}
 
@@ -699,6 +701,7 @@ functor Make(M : AUTH) = struct
 
         fun get x =
             so <- apiOpt ("webinars/" ^ show x);
+            debug ("Webinar: " ^ show so);
             return (Option.mp fromJson so)
 
         structure Registrants = struct
