@@ -161,7 +161,7 @@ datatype updatesMode =
 
 
 (** * The main API interface *)
-                        
+
 functor Make(M : AUTH) : sig
     val emailAddress : transaction (option string)
     val profile : transaction (option {EmailAddress : string, DisplayName : option string})
@@ -180,7 +180,7 @@ functor Make(M : AUTH) : sig
         end
 
         structure Events : sig
-            val list : calendar_id -> {Min : option time, Max : option time} -> transaction (list event)
+            val list : calendar_id -> {Min : option time, Max : option time, SingleEvents : option bool} -> transaction (list event)
             val insert : calendar_id -> {SendUpdates : option updatesMode} -> newEvent -> transaction event
             val update : calendar_id -> event -> transaction event
             val delete : calendar_id -> event_id -> transaction unit

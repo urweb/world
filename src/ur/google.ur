@@ -631,6 +631,9 @@ functor Make(M : AUTH) = struct
                 url <- return (case bounds.Max of
                                    None => url
                                  | Some max => url ^ (if Option.isNone bounds.Min then "?" else "&") ^ "timeMax=" ^ rfc3339_out max);
+                url <- return (case bounds.SingleEvents of
+                                   None => url
+                                 | Some b => url ^ (if Option.isNone bounds.Min && Option.isNone bounds.Max then "?" else "&") ^ "singleEvents=" ^ toJson b);
                 s <- api url;
                 return (List.mp ingestEvent (fromJson s : events).Items)
 
