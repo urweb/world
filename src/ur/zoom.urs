@@ -264,11 +264,40 @@ type registrant = {
      JoinUrl : option string
 }
 
+type participant = {
+     Id : option string,
+     UserId : option string,
+     UserName : option string,
+     Device : option string,
+     IpAddress : option string,
+     Location : option string,
+     NetworkType : option string,
+     Microphone : option string,
+     Speaker : option string,
+     Camera : option string,
+     DataCenter : option string,
+     ConnectionType : option string,
+     JoinTime : option time,
+     LeaveTime : option time,
+     ShareApplication : option bool,
+     ShareDesktop : option bool,
+     ShareWhiteboard : option bool,
+     Recording : option bool,
+     PcName : option string,
+     Domain : option string,
+     MacAddr : option string,
+     HarddiskId : option string,
+     Version : option string,
+     InRoomParticipants : option int,
+     LeaveReason : option string
+}
+
 functor Make(M : AUTH) : sig
     structure Meetings : sig
         val list : transaction (list meeting)
         val create : meeting -> transaction meeting
         val get : int (* ID *) -> transaction (option meeting)
+        val participants : string (* UUID *) -> transaction (list participant)
     end
 
     structure Webinars : sig

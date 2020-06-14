@@ -653,6 +653,66 @@ type registrants_response = {
 }
 val _ : json registrants_response = json_record {Registrants = "registrants"}
 
+type participant = {
+     Id : option string,
+     UserId : option string,
+     UserName : option string,
+     Device : option string,
+     IpAddress : option string,
+     Location : option string,
+     NetworkType : option string,
+     Microphone : option string,
+     Speaker : option string,
+     Camera : option string,
+     DataCenter : option string,
+     ConnectionType : option string,
+     JoinTime : option time,
+     LeaveTime : option time,
+     ShareApplication : option bool,
+     ShareDesktop : option bool,
+     ShareWhiteboard : option bool,
+     Recording : option bool,
+     PcName : option string,
+     Domain : option string,
+     MacAddr : option string,
+     HarddiskId : option string,
+     Version : option string,
+     InRoomParticipants : option int,
+     LeaveReason : option string
+}
+
+val _ : json participant = json_record_withOptional {}
+                          {Id = "id",
+                           UserId = "user_id",
+                           UserName = "user_name",
+                           Device = "device",
+                           IpAddress = "ip_address",
+                           Location = "location",
+                           NetworkType = "network_type",
+                           Microphone = "microphone",
+                           Speaker = "speaker",
+                           Camera = "camera",
+                           DataCenter = "data_center",
+                           ConnectionType = "connection_type",
+                           JoinTime = "join_time",
+                           LeaveTime = "leave_time",
+                           ShareApplication = "share_application",
+                           ShareDesktop = "share_desktop",
+                           ShareWhiteboard = "share_whiteboard",
+                           Recording = "recording",
+                           PcName = "pc_name",
+                           Domain = "domain",
+                           MacAddr = "mac_addr",
+                           HarddiskId = "harddisk_id",
+                           Version = "version",
+                           InRoomParticipants = "in_room_participants",
+                           LeaveReason = "leave_reason"}
+
+type participants_response = {
+    Participants : list participant
+}
+val _ : json participants_response = json_record {Participants = "participants"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -688,6 +748,10 @@ functor Make(M : AUTH) = struct
         fun get x =
             so <- apiOpt ("meetings/" ^ show x);
             return (Option.mp fromJson so)
+
+        fun participants x =
+            s <- api ("metrics/meetings/" ^ Urls.urlencode x ^ "/participants");
+            return (fromJson s : participants_response).Participants
     end
 
     structure Webinars = struct
@@ -701,7 +765,6 @@ functor Make(M : AUTH) = struct
 
         fun get x =
             so <- apiOpt ("webinars/" ^ show x);
-            debug ("Webinar: " ^ show so);
             return (Option.mp fromJson so)
 
         structure Registrants = struct
