@@ -750,8 +750,11 @@ functor Make(M : AUTH) = struct
             return (Option.mp fromJson so)
 
         fun participants x =
-            s <- api ("metrics/meetings/" ^ Urls.urlencode x ^ "/participants");
-            return (fromJson s : participants_response).Participants
+            so <- apiOpt ("metrics/meetings/" ^ Urls.urlencode x ^ "/participants");
+            case so of
+                None => return []
+              | Some s =>
+                return (fromJson s : participants_response).Participants
     end
 
     structure Webinars = struct
