@@ -2,3 +2,4 @@ basic_in.ur
 *.exe
 *.sql
 zoomSecrets.ur
+oidcSecrets.ur
