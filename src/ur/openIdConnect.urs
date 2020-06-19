@@ -10,7 +10,7 @@ end
 
 functor Make(M : S) : sig
     val authorize : transaction page
-    val whoami : transaction (option string)
+    val email : transaction (option string)
     val name : transaction (option string)
     val logout : transaction unit
 end

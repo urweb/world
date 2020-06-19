@@ -87,7 +87,7 @@ functor Make(M : S) = struct
                         val scope = None
                     end)
 
-    val whoami =
+    val email =
         c <- getCookie user;
         case c of
             None => return None
