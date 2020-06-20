@@ -322,6 +322,10 @@ functor Make(M : AUTH) : sig
         val create : meeting -> transaction meeting
         val get : int (* ID *) -> transaction (option meeting)
         val participants : string (* UUID *) -> transaction (list participant)
+
+        structure Registrants : sig
+            val list : int (* ID *) -> transaction (list registrant)
+        end
     end
 
     structure Webinars : sig
@@ -330,8 +334,8 @@ functor Make(M : AUTH) : sig
         val get : int (* ID *) -> transaction (option webinar)
 
         structure Registrants : sig
-            val list : int (* Webinar ID *) -> transaction (list registrant)
-            val absentees : string (* Webinar UUID *) -> transaction (list registrant)
+            val list : int (* ID *) -> transaction (list registrant)
+            val absentees : string (* UUID *) -> transaction (list registrant)
         end
     end
 

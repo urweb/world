@@ -343,11 +343,6 @@ val _ : json meeting = json_record_withOptional
                             Recurrence = "recurrence",
                             Settings = "settings"}
 
-type meetings_response = {
-     Meetings : list meeting
-}
-val _ : json meetings_response = json_record {Meetings = "meetings"}
-
 datatype webinar_type =
          Webinar
        | WebinarRecurringUnfixed
@@ -459,11 +454,6 @@ val _ : json webinar = json_record_withOptional {Topic = "topic",
                         RegistrationUrl = "registration_url",
                         Recurrence = "recurrence",
                         Settings = "settings"}
-
-type webinars_response = {
-     Webinars : list webinar
-}
-val _ : json webinars_response = json_record {Webinars = "webinars"}
 
 datatype file_type =
          MP4
@@ -595,11 +585,6 @@ val _ : json recording = json_record_withOptional {Topic = "topic"}
                           ShareUrl = "share_url",
                           RecordingFiles = "recording_files"}
 
-type recordings_response = {
-    Meetings : list recording
-}
-val _ : json recordings_response = json_record {Meetings = "meetings"}
-
 datatype registrant_status =
          Approved
        | Pending
@@ -660,11 +645,6 @@ val _ : json registrant = json_record_withOptional {Email = "email",
                            CreateTime = "create_time",
                            JoinUrl = "join_url"}
 
-type registrants_response = {
-    Registrants : list registrant
-}
-val _ : json registrants_response = json_record {Registrants = "registrants"}
-
 type participant = {
      Id : option string,
      UserId : option string,
@@ -720,11 +700,6 @@ val _ : json participant = json_record_withOptional {}
                            InRoomParticipants = "in_room_participants",
                            LeaveReason = "leave_reason"}
 
-type participants_response = {
-    Participants : list participant
-}
-val _ : json participants_response = json_record {Participants = "participants"}
-
 functor Make(M : AUTH) = struct
     open M
 
@@ -748,10 +723,62 @@ functor Make(M : AUTH) = struct
         tok <- token;
         WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) (Some "application/json") body
 
+    fun apiPaged [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
+        let
+            val j : json {PageCount : option int, Records : list t} =
+                json_record_withOptional {Records = listLabel}
+                {PageCount = "page_count"}
+        in
+            page <- api url;
+            page <- return (@fromJson j page);
+            case page.PageCount of
+                None => return page.Records
+              | Some 1 => return page.Records
+              | Some numPages =>
+                let
+                    fun loop n acc =
+                        if n > numPages then
+                            return (List.rev acc)
+                        else
+                            page <- api (url ^ "?page_number=" ^ show n);
+                            page <- return (@fromJson j page);
+                            loop (n + 1) (List.revAppend page.Records acc)
+                in
+                    loop 2 (List.rev page.Records)
+                end
+        end
+
+    fun apiPagedOpt [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
+        let
+            val j : json {PageCount : option int, Records : list t} =
+                json_record_withOptional {Records = listLabel}
+                {PageCount = "page_count"}
+        in
+            page <- apiOpt url;
+            case page of
+                None => return []
+              | Some page =>
+                page <- return (@fromJson j page);
+                case page.PageCount of
+                    None => return page.Records
+                  | Some 1 => return page.Records
+                  | Some numPages =>
+                    let
+                        fun loop n acc =
+                            if n > numPages then
+                                return (List.rev acc)
+                            else
+                                page <- api (url ^ "?page_number=" ^ show n);
+                                page <- return (@fromJson j page);
+                                loop (n + 1) (List.revAppend page.Records acc)
+                    in
+                        loop 2 (List.rev page.Records)
+                    end
+        end
+
     structure Meetings = struct
         val list =
-            s <- api "users/me/meetings";
-            return (fromJson s : meetings_response).Meetings
+            apiPaged "meetings" "users/me/meetings"
 
         fun create x =
             s <- apiPost "users/me/meetings" (toJson x);
@@ -762,17 +789,17 @@ functor Make(M : AUTH) = struct
             return (Option.mp fromJson so)
 
         fun participants x =
-            so <- apiOpt ("metrics/meetings/" ^ Urls.urlencode x ^ "/participants");
-            case so of
-                None => return []
-              | Some s =>
-                return (fromJson s : participants_response).Participants
+            apiPagedOpt "participants" ("metrics/meetings/" ^ Urls.urlencode x ^ "/participants")
+
+        structure Registrants = struct
+            fun list x =
+                apiPaged "registrants" ("meetings/" ^ show x ^ "/registrants")
+        end
     end
 
     structure Webinars = struct
         val list =
-            s <- api "users/me/webinars";
-            return (fromJson s : webinars_response).Webinars
+            apiPaged "webinars" "users/me/webinars"
 
         fun create x =
             s <- apiPost "users/me/webinars" (toJson x);
@@ -784,19 +811,16 @@ functor Make(M : AUTH) = struct
 
         structure Registrants = struct
             fun list x =
-                s <- api ("webinars/" ^ show x ^ "/registrants");
-                return (fromJson s : registrants_response).Registrants
+                apiPaged "registrants" ("webinars/" ^ show x ^ "/registrants")
 
             fun absentees x =
-                s <- api ("past_webinars/" ^ Urls.urlencode x ^ "/absentees");
-                return (fromJson s : registrants_response).Registrants
+                apiPaged "registrants" ("past_webinars/" ^ Urls.urlencode x ^ "/absentees")
         end
     end
 
     structure CloudRecordings = struct
         val list =
-            s <- api "users/me/recordings";
-            return (fromJson s : recordings_response).Meetings
+            apiPaged "meetings" "users/me/recordings"
 
         fun get x =
             so <- apiOpt ("meetings/" ^ show x ^ "/recordings");
