@@ -918,4 +918,20 @@ functor ThreeLegged(M : sig
                            FROM secrets
                            WHERE secrets.Secret = {[n]}
                              AND secrets.Expires > CURRENT_TIMESTAMP)
+
+    val logout = clearCookie user
+
+    val status =
+        toko <- token;
+        li <- source (Option.isSome toko);
+        cur <- currentUrl;
+        return <xml>
+          <dyn signal={liV <- signal li;
+                       if liV then
+                           return <xml><button value="Log out of Zoom"
+                                               onclick={fn _ => rpc logout; set li False}/></xml>
+                       else
+                           return <xml><button value="Log into Zoom"
+                                               onclick={fn _ => redirect (url authorize)}/></xml>}/>
+        </xml>
 end
