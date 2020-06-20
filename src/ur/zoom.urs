@@ -1,13 +1,36 @@
-signature S = sig
-    val api_key : string
-    val api_secret : string
+structure Scope : sig
+    type t
+    val empty : t
+    val union : t -> t -> t
+    val readonly : t -> bool
+
+    val meetingRead : t
+    val meetingWrite : t
+    val webinarRead : t
+    val webinarWrite : t
 end
 
 signature AUTH = sig
     val token : transaction (option string)
 end
 
-functor TwoLegged(M : S) : AUTH
+functor TwoLegged(M : sig
+                      val api_key : string
+                      val api_secret : string
+                  end) : sig
+    val token : transaction (option string)
+end
+functor ThreeLegged(M : sig
+                        val client_id : string
+                        val client_secret : string
+                        val https : bool
+
+                        val scopes : Scope.t
+                        val onCompletion : transaction page
+                    end) : sig
+    val token : transaction (option string)
+    val authorize : transaction page
+end
 
 datatype meeting_type =
          Instant

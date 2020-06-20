@@ -4,6 +4,7 @@ database dbname=zoomDemo
 sql zoomDemo.sql
 safeGetDefault
 allow url https://*
+prefix http://localhost:8080/
 
 zoomSecrets
 zoomDemo

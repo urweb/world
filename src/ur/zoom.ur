@@ -1,8 +1,20 @@
 open Json
 
-signature S = sig
-    val api_key : string
-    val api_secret : string
+structure Scope = struct
+    type t = Scopes.t [MeetingRead, MeetingWrite, WebinarRead, WebinarWrite]
+    val empty = Scopes.empty
+    val union = Scopes.union
+    val toString = Scopes.toString {MeetingRead = "meeting:read",
+                                    MeetingWrite = "meeting:write",
+                                    WebinarRead = "webinar:read",
+                                    WebinarWrite = "webinar:write"}
+
+    val meetingRead = Scopes.one [#MeetingRead]
+    val meetingWrite = Scopes.one [#MeetingWrite]
+    val webinarRead = Scopes.one [#WebinarRead]
+    val webinarWrite = Scopes.one [#WebinarWrite]
+
+    val readonly = Scopes.disjoint (union meetingWrite webinarWrite)
 end
 
 signature AUTH = sig
@@ -817,7 +829,10 @@ type jwt_response = {
 val _ : json jwt_response = json_record {AccessToken = "access_token",
                                          ExpiresIn = "expires_in"}
 
-functor TwoLegged(M : S) = struct
+functor TwoLegged(M : sig
+                      val api_key : string
+                      val api_secret : string
+                  end) = struct
     open M
 
     table mytoken : { Token : string,
@@ -848,4 +863,59 @@ functor TwoLegged(M : S) = struct
             dml (INSERT INTO mytoken(Token, Expires)
                  VALUES ({[token]}, {[exp]}));
             return (Some token)
+end
+
+functor ThreeLegged(M : sig
+                        val client_id : string
+                        val client_secret : string
+                        val https : bool
+
+                        val scopes : Scope.t
+                        val onCompletion : transaction page
+                    end) = struct
+    open M
+
+    table secrets : { Secret : int,
+                      Token : string,
+                      Expires : time }
+      PRIMARY KEY Secret
+
+    task periodic 60 = fn () =>
+                          tm <- now;
+                          dml (DELETE FROM secrets
+                               WHERE Expires < {[addSeconds tm (-60)]})
+
+    cookie user : int
+
+    fun withToken {Token = tok, Expiration = seconds, ...} =
+        case seconds of
+            None => error <xml>Missing token expiration in OAuth response</xml>
+          | Some seconds =>
+            secret <- rand;
+            tm <- now;
+            dml (INSERT INTO secrets(Secret, Token, Expires)
+                 VALUES ({[secret]}, {[tok]}, {[addSeconds tm (seconds * 3 / 4)]}));
+            setCookie user {Value = secret,
+                            Expires = None,
+                            Secure = https}
+
+    open Oauth.Make(struct
+                        open M
+
+                        val authorize_url = bless "https://api.zoom.us/oauth/authorize"
+                        val access_token_url = bless "https://api.zoom.us/oauth/token"
+
+                        val withToken = withToken
+                        val scope = Some (Scope.toString scopes)
+                    end)
+
+    val token =
+        c <- getCookie user;
+        case c of
+            None => return None
+          | Some n =>
+            oneOrNoRowsE1 (SELECT (secrets.Token)
+                           FROM secrets
+                           WHERE secrets.Secret = {[n]}
+                             AND secrets.Expires > CURRENT_TIMESTAMP)
 end
