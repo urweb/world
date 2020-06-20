@@ -731,7 +731,7 @@ functor Make(M : AUTH) = struct
     val token =
         toko <- token;
         case toko of
-            None => error <xml>You must be logged into Google Calendar to use this feature.</xml>
+            None => error <xml>You must be logged into Zoom to use this feature.</xml>
           | Some tok => return tok
 
     val prefix = "https://api.zoom.us/v2/"
