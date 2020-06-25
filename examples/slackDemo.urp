@@ -1,0 +1,10 @@
+library ../src/ur
+rewrite all SlackDemo/*
+database dbname=slackDemo
+sql slackDemo.sql
+safeGetDefault
+allow url https://*
+prefix http://localhost:8080/
+
+slackSecrets
+slackDemo
