@@ -87,4 +87,9 @@ functor Make(M : AUTH) : sig
         val create : string (* channel name *) -> transaction conversation
         val url : conversation -> url
     end
+
+    structure Chat : sig
+        val postMessage : {Channel : string (* ID *),
+                           Text : string} -> transaction message
+    end
 end

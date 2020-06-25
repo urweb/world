@@ -166,7 +166,7 @@ functor Make(M : AUTH) = struct
         if sr.Ok then
             return s
         else
-            error <xml>Slack API error: <tt>{[sr.Error]}</tt></xml>
+            error <xml>Slack API error: {[sr.Error]}</xml>
 
     fun api url =
         tok <- token;
@@ -207,5 +207,12 @@ functor Make(M : AUTH) = struct
                            ^ case c.SharedTeamIds of
                                  Some (tid :: _) => "&team=" ^ Urls.urlencode tid
                                | _ => "")
+    end
+
+    structure Chat = struct
+        fun postMessage r =
+            s <- apiPost ("chat.postMessage?channel=" ^ Urls.urlencode r.Channel
+                          ^ "&text=" ^ Urls.urlencode r.Text);
+            return (oneJsonField "message" s)
     end
 end

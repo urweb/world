@@ -2,12 +2,18 @@
  * defining [token]. *)
 structure S = Slack.Make(Slack.TwoLegged(SlackSecrets))
 
+fun postMessage ch text =
+    Monad.ignore (S.Chat.postMessage {Channel = ch, Text = text})
+
 fun channel ch =
+    text <- source "";
     ms <- S.Conversations.history ch;
     return <xml><body>
       <ol>
         {List.mapX (fn m => <xml><li>{[m.User]}: {[m.Text]}</li></xml>) ms}
       </ol>
+      <hr/>
+      Post message: <ctextbox source={text}/> <button value="Go" onclick={fn _ => text <- get text; rpc (postMessage ch text); redirect (url (channel ch))}/>
     </body></xml>
 
 fun newChannel name =
