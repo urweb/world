@@ -135,7 +135,7 @@ functor Make(M : AUTH) : sig
         val list : transaction (list conversation)
         val history : string (* conversation ID *) -> transaction (list message)
         val create : string (* channel name *) -> transaction conversation
-        val url : conversation -> url
+        val url : {Channel : string (* conversation ID *), Team : option string (* workspace ID *)} -> url
     end
 
     structure Chat : sig
@@ -147,3 +147,7 @@ functor Make(M : AUTH) : sig
         val info : string (* user ID *) -> transaction user
     end
 end
+
+val suggestChannelName : string -> string
+(* Create a version of an arbitrary string that works as a Slack channel name,
+ * doing our best to preserve readability. *)

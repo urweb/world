@@ -304,9 +304,9 @@ functor Make(M : AUTH) = struct
         fun create name =
             apiPostField "channel" ("conversations.create?name=" ^ Urls.urlencode name)
 
-        fun url c = bless (urlPrefix ^ "app_redirect?channel=" ^ Urls.urlencode c.Id
-                           ^ case c.SharedTeamIds of
-                                 Some (tid :: _) => "&team=" ^ Urls.urlencode tid
+        fun url c = bless (urlPrefix ^ "app_redirect?channel=" ^ Urls.urlencode c.Channel
+                           ^ case c.Team of
+                                 Some tid => "&team=" ^ Urls.urlencode tid
                                | _ => "")
     end
 
@@ -320,3 +320,31 @@ functor Make(M : AUTH) = struct
         fun info uid = apiField "user" ("users.info?user=" ^ Urls.urlencode uid)
     end
 end
+
+fun suggestChannelName s =
+    let
+        val len = String.length s
+
+        fun build i acc =
+            if i >= len || String.length acc >= 80 then
+                acc
+            else
+                let
+                    val ch = String.sub s i
+                    val cho =
+                        if Char.isAlnum ch then
+                            Some (Char.toLower ch)
+                        else if Char.isSpace ch then
+                            Some #"-"
+                        else if ch = #"-" || ch = #"_" then
+                            Some ch
+                        else
+                            None
+                in
+                    build (i + 1) (case cho of
+                                       None => acc
+                                     | Some ch' => acc ^ String.str ch')
+                end
+    in
+        build 0 ""
+    end
