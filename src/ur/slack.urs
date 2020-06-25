@@ -41,6 +41,7 @@ type conversation = {
      IsShared : bool,
      IsExtShared : bool,
      IsOrgShared : bool,
+     SharedTeamIds : option (list string),
      PendingShared : list string,
      IsPendingExtShared : bool,
      IsMember : bool,
@@ -57,5 +58,6 @@ type conversation = {
 functor Make(M : AUTH) : sig
     structure Conversations : sig
         val list : transaction (list conversation)
+        val url : conversation -> url
     end
 end

@@ -56,6 +56,7 @@ type conversation = {
      IsShared : bool,
      IsExtShared : bool,
      IsOrgShared : bool,
+     SharedTeamIds : option (list string),
      PendingShared : list string,
      IsPendingExtShared : bool,
      IsMember : bool,
@@ -94,7 +95,8 @@ val _ : json conversation = json_record_withOptional
                                  NumMembers = "num_members"}
                                 {IsReadOnly = "is_read_only",
                                  LastRead = "last_read",
-                                 Locale = "locale"}
+                                 Locale = "locale",
+                                 SharedTeamIds = "shared_team_ids"}
 
 
 functor Make(M : AUTH) = struct
@@ -126,11 +128,17 @@ functor Make(M : AUTH) = struct
                 json_record {Records = listLabel}
         in
             page <- api url;
-            debug ("Listing: " ^ page);
             return (@fromJson j page).Records
         end
 
+    val urlPrefix = "https://slack.com/"
+
     structure Conversations = struct
         val list = apiList "channels" "conversations.list"
+
+        fun url c = bless (urlPrefix ^ "app_redirect?channel=" ^ Urls.urlencode c.Id
+                           ^ case c.SharedTeamIds of
+                                 Some (tid :: _) => "&team=" ^ Urls.urlencode tid
+                               | _ => "")
     end
 end

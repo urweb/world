@@ -6,6 +6,6 @@ val main =
     chs <- S.Conversations.list;
     return <xml><body>
       <ul>
-        {List.mapX (fn ch => <xml><li>{[ch.Nam]}</li></xml>) chs}
+        {List.mapX (fn ch => <xml><li><a href={S.Conversations.url ch}>{[ch.Nam]}</a></li></xml>) chs}
       </ul>
     </body></xml>
