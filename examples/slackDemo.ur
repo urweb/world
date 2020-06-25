@@ -8,9 +8,12 @@ fun postMessage ch text =
 fun channel ch =
     text <- source "";
     ms <- S.Conversations.history ch;
+    ms <- List.mapM (fn m =>
+                        user <- S.Users.info m.User;
+                        return (user.Nam, user.RealName, m.Text)) ms;
     return <xml><body>
       <ol>
-        {List.mapX (fn m => <xml><li>{[m.User]}: {[m.Text]}</li></xml>) ms}
+        {List.mapX (fn (user, rname, text) => <xml><li>{[user]} <i>({[rname]})</i>: {[text]}</li></xml>) ms}
       </ol>
       <hr/>
       Post message: <ctextbox source={text}/> <button value="Go" onclick={fn _ => text <- get text; rpc (postMessage ch text); redirect (url (channel ch))}/>

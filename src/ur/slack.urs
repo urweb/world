@@ -80,6 +80,56 @@ type message = {
      Reactions : option (list reaction)
 }
 
+type profile = {
+     Title : string,
+     Phone : string,
+     Skype : string,
+     RealName : string,
+     RealNameNormalized : string,
+     DisplayName : string,
+     DisplayNameNormalized : string,
+     StatusText : string,
+     StatusEmoji : string,
+     StatusExpiration : time,
+     AvatarHash : string,
+     FirstName : option string,
+     LastName : option string,
+     Email : option string,
+     ImageOriginal : option string,
+     Image24 : option string,
+     Image32 : option string,
+     Image48 : option string,
+     Image72 : option string,
+     Image192 : option string,
+     Image512 : option string,
+     Team : string
+}
+
+type user = {
+     Id : string,
+     TeamId : string,
+     Nam : string,
+     Deleted : bool,
+     Color : string,
+     RealName : string,
+     Tz : string,
+     TzLabel : string,
+     TzOffset : int,
+     Profile : profile,
+     IsAdmin : bool,
+     IsOwner : bool,
+     IsPrimaryOwner : bool,
+     IsRestricted : bool,
+     IsUltraRestricted : bool,
+     IsBot : bool,
+     IsStranger : option bool,
+     Updated : time,
+     IsAppUser : bool,
+     IsInvitedUser : option bool,
+     Has2fa : option bool,
+     Locale : option string
+}
+
 functor Make(M : AUTH) : sig
     structure Conversations : sig
         val list : transaction (list conversation)
@@ -91,5 +141,9 @@ functor Make(M : AUTH) : sig
     structure Chat : sig
         val postMessage : {Channel : string (* ID *),
                            Text : string} -> transaction message
+    end
+
+    structure Users : sig
+        val info : string (* user ID *) -> transaction user
     end
 end

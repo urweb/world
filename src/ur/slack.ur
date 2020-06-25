@@ -140,6 +140,101 @@ val _ : json message = json_record_withOptional
                             PinnedTo = "pinned_to",
                             Reactions = "reactions"}
 
+type profile = {
+     Title : string,
+     Phone : string,
+     Skype : string,
+     RealName : string,
+     RealNameNormalized : string,
+     DisplayName : string,
+     DisplayNameNormalized : string,
+     StatusText : string,
+     StatusEmoji : string,
+     StatusExpiration : time,
+     AvatarHash : string,
+     FirstName : option string,
+     LastName : option string,
+     Email : option string,
+     ImageOriginal : option string,
+     Image24 : option string,
+     Image32 : option string,
+     Image48 : option string,
+     Image72 : option string,
+     Image192 : option string,
+     Image512 : option string,
+     Team : string
+}
+val _ : json profile = json_record_withOptional
+                           {Title = "title",
+                            Phone = "phone",
+                            Skype = "skype",
+                            RealName = "real_name",
+                            RealNameNormalized = "real_name_normalized",
+                            DisplayName = "display_name",
+                            DisplayNameNormalized = "display_name_normalized",
+                            StatusText = "status_text",
+                            StatusEmoji = "status_emoji",
+                            StatusExpiration = "status_expiration",
+                            AvatarHash = "avatar_hash",
+                            Team = "team"}
+                           {Email = "email",
+                            FirstName = "first_name",
+                            LastName = "last_name",
+                            ImageOriginal = "image_original",
+                            Image24 = "image_24",
+                            Image32 = "image_32",
+                            Image48 = "image_48",
+                            Image72 = "image_72",
+                            Image192 = "image_192",
+                            Image512 = "image_512"}
+
+type user = {
+     Id : string,
+     TeamId : string,
+     Nam : string,
+     Deleted : bool,
+     Color : string,
+     RealName : string,
+     Tz : string,
+     TzLabel : string,
+     TzOffset : int,
+     Profile : profile,
+     IsAdmin : bool,
+     IsOwner : bool,
+     IsPrimaryOwner : bool,
+     IsRestricted : bool,
+     IsUltraRestricted : bool,
+     IsBot : bool,
+     IsStranger : option bool,
+     Updated : time,
+     IsAppUser : bool,
+     IsInvitedUser : option bool,
+     Has2fa : option bool,
+     Locale : option string
+}
+val _ : json user = json_record_withOptional
+                        {Id = "id",
+                         TeamId = "team_id",
+                         Nam = "name",
+                         Deleted = "deleted",
+                         Color = "color",
+                         RealName = "real_name",
+                         Tz = "tz",
+                         TzLabel = "tz_label",
+                         TzOffset = "tz_offset",
+                         Profile = "profile",
+                         IsAdmin = "is_admin",
+                         IsOwner = "is_owner",
+                         IsPrimaryOwner = "is_primary_owner",
+                         IsRestricted = "is_restricted",
+                         IsUltraRestricted = "is_ultra_restricted",
+                         IsBot = "is_bot",
+                         Updated = "updated",
+                         IsAppUser = "is_app_user"}
+                        {Has2fa = "has_2fa",
+                         IsInvitedUser = "is_invited_user",
+                         IsStranger = "is_stranger",
+                         Locale = "locale"}
 
 functor Make(M : AUTH) = struct
     open M
@@ -188,9 +283,16 @@ functor Make(M : AUTH) = struct
             (@fromJson j s).Value
         end
 
-    fun apiList [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
+    fun apiField [t ::: Type] (_ : json t) (label : string) (url : string) : transaction t =
         page <- api url;
-        return (oneJsonField listLabel page)
+        return (oneJsonField label page)
+
+    fun apiPostField [t ::: Type] (_ : json t) (label : string) (url : string) : transaction t =
+        page <- apiPost url;
+        return (oneJsonField label page)
+
+    fun apiList [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
+        apiField listLabel url
 
     val urlPrefix = "https://slack.com/"
 
@@ -200,8 +302,7 @@ functor Make(M : AUTH) = struct
         fun history ch = apiList "messages" ("conversations.history?channel=" ^ Urls.urlencode ch)
 
         fun create name =
-            s <- apiPost ("conversations.create?name=" ^ Urls.urlencode name);
-            return (oneJsonField "channel" s)
+            apiPostField "channel" ("conversations.create?name=" ^ Urls.urlencode name)
 
         fun url c = bless (urlPrefix ^ "app_redirect?channel=" ^ Urls.urlencode c.Id
                            ^ case c.SharedTeamIds of
@@ -211,8 +312,11 @@ functor Make(M : AUTH) = struct
 
     structure Chat = struct
         fun postMessage r =
-            s <- apiPost ("chat.postMessage?channel=" ^ Urls.urlencode r.Channel
-                          ^ "&text=" ^ Urls.urlencode r.Text);
-            return (oneJsonField "message" s)
+            apiPostField "message" ("chat.postMessage?channel=" ^ Urls.urlencode r.Channel
+                                    ^ "&text=" ^ Urls.urlencode r.Text)
+    end
+
+    structure Users = struct
+        fun info uid = apiField "user" ("users.info?user=" ^ Urls.urlencode uid)
     end
 end
