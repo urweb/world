@@ -47,17 +47,44 @@ type conversation = {
      IsMember : bool,
      IsPrivate : bool,
      IsMpim : bool,
-     LastRead : option time,
+     LastRead : option string,
      Topic : topic_or_purpose,
      Purpose : topic_or_purpose,
      PreviousNames : list string,
-     NumMembers : int,
+     NumMembers : option int,
      Locale : option string
+}
+
+type edited = {
+     User : string,
+     Ts : string
+}
+
+type reaction = {
+     Nam : string,
+     Count : int,
+     Users : list string
+}
+
+type message = {
+     Typ : string,
+     Subtype : option string,
+     Channel : option string,
+     User : string,
+     Text : string,
+     Ts : string,
+     Edited : option edited,
+     Hidden : option bool,
+     IsStarred : option bool,
+     PinnedTo : option (list string),
+     Reactions : option (list reaction)
 }
 
 functor Make(M : AUTH) : sig
     structure Conversations : sig
         val list : transaction (list conversation)
+        val history : string (* conversation ID *) -> transaction (list message)
+        val create : string (* channel name *) -> transaction conversation
         val url : conversation -> url
     end
 end

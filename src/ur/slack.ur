@@ -62,11 +62,11 @@ type conversation = {
      IsMember : bool,
      IsPrivate : bool,
      IsMpim : bool,
-     LastRead : option time,
+     LastRead : option string,
      Topic : topic_or_purpose,
      Purpose : topic_or_purpose,
      PreviousNames : list string,
-     NumMembers : int,
+     NumMembers : option int,
      Locale : option string
 }
 val _ : json conversation = json_record_withOptional
@@ -91,12 +91,54 @@ val _ : json conversation = json_record_withOptional
                                  IsMpim = "is_mpim",
                                  Topic = "topic",
                                  Purpose = "purpose",
-                                 PreviousNames = "previous_names",
-                                 NumMembers = "num_members"}
+                                 PreviousNames = "previous_names"}
                                 {IsReadOnly = "is_read_only",
                                  LastRead = "last_read",
                                  Locale = "locale",
-                                 SharedTeamIds = "shared_team_ids"}
+                                 SharedTeamIds = "shared_team_ids",
+                                 NumMembers = "num_members"}
+
+type edited = {
+     User : string,
+     Ts : string
+}
+val _ : json edited = json_record {User = "user",
+                                   Ts = "ts"}
+
+type reaction = {
+     Nam : string,
+     Count : int,
+     Users : list string
+}
+val _ : json reaction = json_record {Nam = "name",
+                                     Count = "count",
+                                     Users = "users"}
+
+type message = {
+     Typ : string,
+     Subtype : option string,
+     Channel : option string,
+     User : string,
+     Text : string,
+     Ts : string,
+     Edited : option edited,
+     Hidden : option bool,
+     IsStarred : option bool,
+     PinnedTo : option (list string),
+     Reactions : option (list reaction)
+}
+val _ : json message = json_record_withOptional
+                           {Typ = "type",
+                            User = "user",
+                            Text = "text",
+                            Ts = "ts"}
+                           {Subtype = "subtype",
+                            Channel = "channel",
+                            Edited = "edited",
+                            Hidden = "hidden",
+                            IsStarred = "is_starred",
+                            PinnedTo = "pinned_to",
+                            Reactions = "reactions"}
 
 
 functor Make(M : AUTH) = struct
@@ -110,31 +152,56 @@ functor Make(M : AUTH) = struct
 
     val prefix = "https://slack.com/api/"
 
+    type slack_response = {
+         Ok : bool,
+         Error : option string,
+    }
+    val _ : json slack_response = json_record_withOptional {Ok = "ok"}
+                                                           {Error = "error"}
+
+    fun wrap_errcheck (t : transaction string) =
+        s <- t;
+        debug ("Response: " ^ s);
+        sr <- return (fromJson s : slack_response);
+        if sr.Ok then
+            return s
+        else
+            error <xml>Slack API error: <tt>{[sr.Error]}</tt></xml>
+
     fun api url =
         tok <- token;
-        WorldFfi.get (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False
+        wrap_errcheck (WorldFfi.get (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False)
 
     fun apiOpt url =
         tok <- token;
         WorldFfi.getOpt (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False
 
-    fun apiPost url body =
+    fun apiPost url =
         tok <- token;
-        WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) (Some "application/json") body
+        wrap_errcheck (WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) None "")
+
+    fun oneJsonField [t ::: Type] (_ : json t) (label : string) (s : string) : t =
+        let
+            val j : json {Value : t} =
+                json_record {Value = label}
+        in
+            (@fromJson j s).Value
+        end
 
     fun apiList [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
-        let
-            val j : json {Records : list t} =
-                json_record {Records = listLabel}
-        in
-            page <- api url;
-            return (@fromJson j page).Records
-        end
+        page <- api url;
+        return (oneJsonField listLabel page)
 
     val urlPrefix = "https://slack.com/"
 
     structure Conversations = struct
         val list = apiList "channels" "conversations.list"
+
+        fun history ch = apiList "messages" ("conversations.history?channel=" ^ Urls.urlencode ch)
+
+        fun create name =
+            s <- apiPost ("conversations.create?name=" ^ Urls.urlencode name);
+            return (oneJsonField "channel" s)
 
         fun url c = bless (urlPrefix ^ "app_redirect?channel=" ^ Urls.urlencode c.Id
                            ^ case c.SharedTeamIds of
