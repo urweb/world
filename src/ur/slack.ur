@@ -236,6 +236,8 @@ val _ : json user = json_record_withOptional
                          IsStranger = "is_stranger",
                          Locale = "locale"}
 
+val urlPrefix = "https://slack.com/"
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -294,8 +296,6 @@ functor Make(M : AUTH) = struct
     fun apiList [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
         apiField listLabel url
 
-    val urlPrefix = "https://slack.com/"
-
     structure Conversations = struct
         val list = apiList "channels" "conversations.list"
 
@@ -303,11 +303,6 @@ functor Make(M : AUTH) = struct
 
         fun create name =
             apiPostField "channel" ("conversations.create?name=" ^ Urls.urlencode name)
-
-        fun url c = bless (urlPrefix ^ "app_redirect?channel=" ^ Urls.urlencode c.Channel
-                           ^ case c.Team of
-                                 Some tid => "&team=" ^ Urls.urlencode tid
-                               | _ => "")
     end
 
     structure Chat = struct
@@ -348,3 +343,8 @@ fun suggestChannelName s =
     in
         build 0 ""
     end
+
+fun channelUrl c = bless (urlPrefix ^ "app_redirect?channel=" ^ Urls.urlencode c.Channel
+                          ^ case c.Team of
+                                Some tid => "&team=" ^ Urls.urlencode tid
+                              | _ => "")
