@@ -10,7 +10,6 @@
 #include <openssl/pem.h>
 #include <openssl/hmac.h>
 
-#include <urweb.h>
 #include <world.h>
 
 #define BUF_MAX (10 * 1024 * 1024)
