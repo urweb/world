@@ -711,17 +711,22 @@ functor Make(M : AUTH) = struct
 
     val prefix = "https://api.zoom.us/v2/"
 
+    fun logged [a] (_ : show a) (t : transaction a) =
+        v <- t;
+        debug ("Zoom response: " ^ show v);
+        return v
+
     fun api url =
         tok <- token;
-        WorldFfi.get (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False
+        logged (WorldFfi.get (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False)
 
     fun apiOpt url =
         tok <- token;
-        WorldFfi.getOpt (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False
+        logged (WorldFfi.getOpt (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False)
 
     fun apiPost url body =
         tok <- token;
-        WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) (Some "application/json") body
+        logged (WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) (Some "application/json") body)
 
     fun apiPaged [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
         let

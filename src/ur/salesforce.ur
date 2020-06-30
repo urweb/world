@@ -237,17 +237,22 @@ functor Make(M : sig
             None => error <xml>You must be logged into Salesforce to use this feature.</xml>
           | Some tok => return tok
 
+    fun logged [a] (_ : show a) (t : transaction a) =
+        v <- t;
+        debug ("Salesforce response: " ^ show v);
+        return v
+
     fun api url =
         tok <- token;
-        WorldFfi.get url (Some ("Bearer " ^ tok)) False
+        logged (WorldFfi.get url (Some ("Bearer " ^ tok)) False)
 
     fun apiPost url body =
         tok <- token;
-        WorldFfi.post url (Some ("Bearer " ^ tok)) (Some "application/json") body
+        logged (WorldFfi.post url (Some ("Bearer " ^ tok)) (Some "application/json") body)
 
     fun apiPatch url body =
         tok <- token;
-        WorldFfi.patch url (Some ("Bearer " ^ tok)) (Some "application/json") body
+        logged (WorldFfi.patch url (Some ("Bearer " ^ tok)) (Some "application/json") body)
 
     fun idFromUrl url =
         let
