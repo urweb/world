@@ -62,6 +62,8 @@ functor ThreeLegged(M : sig
                         val scope = None
 
                         val withToken = withToken
+                        val nameForScopeParameter = None
+                        val parseTokenResponse = None
                     end)
 
     val token =

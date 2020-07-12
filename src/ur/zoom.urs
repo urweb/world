@@ -89,7 +89,7 @@ datatype global_dial_in_type =
 type global_dial_in_number = {
      Country : string,
      CountryName : string,
-     City : string,
+     City : option string,
      Number : string,
      Typ : global_dial_in_type
 }

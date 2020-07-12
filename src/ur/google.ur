@@ -148,6 +148,8 @@ functor ThreeLegged(M : sig
 
                         val withToken = withToken
                         val scope = Some (Scope.toString scopes)
+                        val nameForScopeParameter = None
+                        val parseTokenResponse = None
                     end)
 
     val loggedIn = c <- getCookie user;

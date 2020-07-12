@@ -213,15 +213,15 @@ val _ : json global_dial_in_type = json_derived
 type global_dial_in_number = {
      Country : string,
      CountryName : string,
-     City : string,
+     City : option string,
      Number : string,
      Typ : global_dial_in_type
 }
-val _ : json global_dial_in_number = json_record {Country = "country",
-                                                  CountryName = "country_name",
-                                                  City = "city",
-                                                  Number = "number",
-                                                  Typ = "type"}
+val _ : json global_dial_in_number = json_record_withOptional {Country = "country",
+                                                               CountryName = "country_name",
+                                                               Number = "number",
+                                                               Typ = "type"}
+                                                              {City = "city"}
 
 type global_dial_in_country = {
      CountryName : string
@@ -936,6 +936,8 @@ functor ThreeLegged(M : sig
 
                         val withToken = withToken
                         val scope = Some (Scope.toString scopes)
+                        val nameForScopeParameter = None
+                        val parseTokenResponse = None
                     end)
 
     val token =

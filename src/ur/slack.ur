@@ -1,18 +1,23 @@
 open Json
 
 structure Scope = struct
-    type t = Scopes.t [ChannelsHistory, ChannelsManage, ChannelsWrite, ChannelsRead]
+    type t = Scopes.t [ChannelsHistory, ChannelsManage, ChannelsWrite, ChannelsRead,
+                       IdentityBasic, IdentityEmail]
     val empty = Scopes.empty
     val union = Scopes.union
     val toString = Scopes.toString {ChannelsHistory = "channels:history",
                                     ChannelsManage = "channels:manage",
                                     ChannelsWrite = "channels:write",
-                                    ChannelsRead = "channels:read"}
+                                    ChannelsRead = "channels:read",
+                                    IdentityBasic = "identity.basic",
+                                    IdentityEmail = "identity.email"}
 
     val channelsHistory = Scopes.one [#ChannelsHistory]
     val channelsManage = Scopes.one [#ChannelsManage]
     val channelsRead = Scopes.one [#ChannelsRead]
     val channelsWrite = Scopes.one [#ChannelsWrite]
+    val identityBasic = Scopes.one [#IdentityBasic]
+    val identityEmail = Scopes.one [#IdentityEmail]
 
     val readonly = Scopes.disjoint (union channelsWrite channelsManage)
 end
@@ -27,6 +32,85 @@ functor TwoLegged(M : sig
     open M
 
     val token = return (Some token)
+end
+
+functor ThreeLegged(M : sig
+                        val client_id : string
+                        val client_secret : string
+                        val https : bool
+
+                        val scopes : Scope.t
+                        val onCompletion : transaction page
+                    end) = struct
+    open M
+
+    table secrets : { Secret : int,
+                      Token : string,
+                      Expires : time }
+      PRIMARY KEY Secret
+
+    task periodic 60 = fn () =>
+                          tm <- now;
+                          dml (DELETE FROM secrets
+                               WHERE Expires < {[addSeconds tm (-60)]})
+
+    cookie user : int
+
+    fun withToken {Token = tok, Expiration = seconds, ...} =
+        seconds <- return (Option.get 60 seconds);
+        secret <- rand;
+        tm <- now;
+        dml (INSERT INTO secrets(Secret, Token, Expires)
+             VALUES ({[secret]}, {[tok]}, {[addSeconds tm (seconds * 3 / 4)]}));
+        setCookie user {Value = secret,
+                        Expires = None,
+                        Secure = https}
+
+    open Oauth.Make(struct
+                        open M
+
+                        val authorize_url = bless "https://slack.com/oauth/v2/authorize"
+                        val access_token_url = bless "https://slack.com/api/oauth.v2.access"
+
+                        val withToken = withToken
+                        val scope = Some (Scope.toString scopes)
+                        val nameForScopeParameter = Some "user_scope"
+
+                        type token_response = {
+                             AuthedUser : { Token : string }
+                        }
+                        val _ : json {Token : string} = json_record {Token = "access_token"}
+                        val _ : json token_response = json_record {AuthedUser = "authed_user"}
+                        val parseTokenResponse = Some (fn s =>
+                                                          (fromJson s : token_response).AuthedUser
+                                                       ++ {Expires = None})
+                    end)
+
+    val token =
+        c <- getCookie user;
+        case c of
+            None => return None
+          | Some n =>
+            oneOrNoRowsE1 (SELECT (secrets.Token)
+                           FROM secrets
+                           WHERE secrets.Secret = {[n]}
+                             AND secrets.Expires > CURRENT_TIMESTAMP)
+
+    val logout = clearCookie user
+
+    val status =
+        toko <- token;
+        li <- source (Option.isSome toko);
+        cur <- currentUrl;
+        return <xml>
+          <dyn signal={liV <- signal li;
+                       if liV then
+                           return <xml><button value="Log out of Slack"
+                                               onclick={fn _ => rpc logout; set li False}/></xml>
+                       else
+                           return <xml><button value="Log into Slack"
+                                               onclick={fn _ => redirect (url authorize)}/></xml>}/>
+        </xml>
 end
 
 val _ : json time = json_derived (addSeconds minTime) toSeconds
@@ -236,6 +320,14 @@ val _ : json user = json_record_withOptional
                          IsStranger = "is_stranger",
                          Locale = "locale"}
 
+type identity = {
+     Nam : string,
+     Email : option string
+}
+val _ : json identity = json_record_withOptional
+                            {Nam = "name"}
+                            {Email = "email"}
+
 val urlPrefix = "https://slack.com/"
 
 functor Make(M : AUTH) = struct
@@ -313,6 +405,11 @@ functor Make(M : AUTH) = struct
 
     structure Users = struct
         fun info uid = apiField "user" ("users.info?user=" ^ Urls.urlencode uid)
+        val identity =
+            toko <- M.token;
+            case toko of
+                None => return None
+              | Some _ => v <- apiField "user" "users.identity"; return (Some v)
     end
 end
 

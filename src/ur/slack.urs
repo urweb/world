@@ -7,6 +7,9 @@ structure Scope : sig
     val channelsHistory : t
     val channelsManage : t
     val channelsRead : t
+    val channelsWrite : t
+    val identityBasic : t
+    val identityEmail : t
 end
 
 signature AUTH = sig
@@ -17,6 +20,19 @@ functor TwoLegged(M : sig
                       val token : string
                   end) : sig
     val token : transaction (option string)
+end
+functor ThreeLegged(M : sig
+                        val client_id : string
+                        val client_secret : string
+                        val https : bool
+
+                        val scopes : Scope.t
+                        val onCompletion : transaction page
+                    end) : sig
+    val token : transaction (option string)
+    val authorize : transaction page
+    val status : transaction xbody
+    val logout : transaction unit
 end
 
 type topic_or_purpose = {
@@ -130,6 +146,11 @@ type user = {
      Locale : option string
 }
 
+type identity = {
+     Nam : string,
+     Email : option string
+}
+
 functor Make(M : AUTH) : sig
     structure Conversations : sig
         val list : transaction (list conversation)
@@ -144,6 +165,7 @@ functor Make(M : AUTH) : sig
 
     structure Users : sig
         val info : string (* user ID *) -> transaction user
+        val identity : transaction (option identity)
     end
 end
 

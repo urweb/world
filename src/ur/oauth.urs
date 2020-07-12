@@ -8,6 +8,8 @@ signature S = sig
 
     val withToken : {Token : string, Expiration : option int (* seconds from now *)} -> transaction unit
     val onCompletion : transaction page (* run this after we're logged in, e.g. to return to the page where the user asked to log in *)
+    val nameForScopeParameter : option string (* some providers use a different query-parameter name in authorization URLs *)
+    val parseTokenResponse : option (string -> {Token : string, Expires : option int}) (* some providers use weird formats for the 2nd step *)
 end
 
 functor Make(M : S) : sig

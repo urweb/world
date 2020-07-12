@@ -11,6 +11,8 @@ signature S = sig
 
     val withToken : {Token : string, Expiration : option int} -> transaction unit
     val onCompletion : transaction page
+    val nameForScopeParameter : option string
+    val parseTokenResponse : option (string -> {Token : string, Expires : option int})
 end
 
 table states : { State : int, Expires : time }
@@ -105,7 +107,9 @@ functor Make(M : S) = struct
                                          (Error ((fromJson s : error_response).Error), None)
                                      else
                                          let
-                                             val r = fromJson s : token_response
+                                             val r = case parseTokenResponse of
+                                                         None => fromJson s
+                                                       | Some f => f s
                                          in
                                              (Token r.Token, r.Expires)
                                          end)
@@ -146,6 +150,7 @@ functor Make(M : S) = struct
                              ^ "&response_type=code"
                              ^ (case scope of
                                     None => ""
-                                  | Some scope => "&scope=" ^ urlencode scope)))
+                                  | Some scope => "&" ^ Option.get "scope" nameForScopeParameter
+                                                  ^ "=" ^ urlencode scope)))
         end
 end

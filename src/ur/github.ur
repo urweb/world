@@ -108,6 +108,8 @@ functor Make(M : S) = struct
                         val access_token_url = bless "https://github.com/login/oauth/access_token"
                         val withToken = withToken
                         val scope = None
+                        val nameForScopeParameter = None
+                        val parseTokenResponse = None
                     end)
 
     val whoami =

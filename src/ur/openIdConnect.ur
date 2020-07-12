@@ -85,6 +85,8 @@ functor Make(M : S) = struct
 
                         val withToken = withToken
                         val scope = None
+                        val nameForScopeParameter = None
+                        val parseTokenResponse = None
                     end)
 
     val email =
