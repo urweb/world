@@ -57,7 +57,7 @@ functor ThreeLegged(M : sig
     cookie user : int
 
     fun withToken {Token = tok, Expiration = seconds, ...} =
-        seconds <- return (Option.get 60 seconds);
+        seconds <- return (Option.get (60 * 60) seconds);
         secret <- rand;
         tm <- now;
         dml (INSERT INTO secrets(Secret, Token, Expires)
