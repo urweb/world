@@ -156,6 +156,8 @@ functor Make(M : AUTH) : sig
         val list : transaction (list conversation)
         val history : string (* conversation ID *) -> transaction (list message)
         val create : string (* channel name *) -> transaction conversation
+        val setPurpose : string (* conversation ID *) -> string -> transaction unit
+        val setTopic : string (* conversation ID *) -> string -> transaction unit
     end
 
     structure Chat : sig

@@ -1,12 +1,12 @@
 fun hexchar n =
     if n < 0 then
-        error <xml>Oauth.hexchar: negative</xml>
+        error <xml>Urls.hexchar: negative</xml>
     else if n < 10 then
         show n
     else if n < 16 then
         str1 (chr (ord #"A" + n - 10))
     else
-        error <xml>Oauth.hexchar: too big</xml>
+        error <xml>Urls.hexchar: too big</xml>
 
 fun unhexchar ch =
     if Char.isDigit ch then
@@ -14,23 +14,33 @@ fun unhexchar ch =
     else if Char.isXdigit ch then
         ord ch - ord #"A" + 10
     else
-        error <xml>Oauth.unhexchar: invalid</xml>
+        error <xml>Urls.unhexchar: invalid</xml>
+
+fun ord' ch =
+    let
+        val n = ord ch
+    in
+        if n < 0 then
+            256 + n
+        else
+            n
+    end
 
 fun urlencode s =
     let
         fun loop s acc =
-            if String.length s = 0 then
+            if strlenUtf8 s = 0 then
                 acc
             else
                 let
-                    val ch = String.sub s 0
+                    val ch = strsubUtf8 s 0
 
                     val ch' = if Char.isAlnum ch then
                                   str1 ch
                               else
-                                  "%" ^ hexchar (ord ch / 16) ^ hexchar (ord ch % 16)
+                                  "%" ^ hexchar (ord' ch / 16) ^ hexchar (ord' ch % 16)
                 in
-                    loop (String.suffix s 1) (acc ^ ch')
+                    loop (strsuffixUtf8 s 1) (acc ^ ch')
                 end
     in
         loop s ""

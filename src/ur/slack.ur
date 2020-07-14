@@ -367,6 +367,7 @@ functor Make(M : AUTH) = struct
 
     fun apiPost url =
         tok <- token;
+        debug ("POST request: " ^ prefix ^ url);
         wrap_errcheck (WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) None "")
 
     fun oneJsonField [t ::: Type] (_ : json t) (label : string) (s : string) : t =
@@ -395,6 +396,12 @@ functor Make(M : AUTH) = struct
 
         fun create name =
             apiPostField "channel" ("conversations.create?name=" ^ Urls.urlencode name)
+
+        fun setTopic id topic =
+            Monad.ignore (apiPost ("conversations.setTopic?channel=" ^ Urls.urlencode id ^ "&topic=" ^ Urls.urlencode topic))
+
+        fun setPurpose id purpose =
+            Monad.ignore (apiPost ("conversations.setPurpose?channel=" ^ Urls.urlencode id ^ "&purpose=" ^ Urls.urlencode purpose))
     end
 
     structure Chat = struct
