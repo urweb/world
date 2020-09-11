@@ -730,55 +730,44 @@ functor Make(M : AUTH) = struct
 
     fun apiPaged [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
         let
-            val j : json {PageCount : option int, Records : list t} =
+            val j : json {NextPageToken : option string, Records : list t} =
                 json_record_withOptional {Records = listLabel}
-                {PageCount = "page_count"}
+                                         {NextPageToken = "next_page_token"}
+
+            fun retrieve toko acc =
+                page <- api (case toko of None => url | Some tok => url ^ "?next_page_token=" ^ tok);
+                page <- return (@fromJson j page);
+                case page.NextPageToken of
+                    None => return (case acc of [] => page.Records | _ => List.rev (List.revAppend page.Records acc))
+                  | Some "" => return (case acc of [] => page.Records | _ => List.rev (List.revAppend page.Records acc))
+                  | Some _ => retrieve page.NextPageToken (List.revAppend page.Records acc)
         in
-            page <- api url;
-            page <- return (@fromJson j page);
-            case page.PageCount of
-                None => return page.Records
-              | Some 1 => return page.Records
-              | Some numPages =>
-                let
-                    fun loop n acc =
-                        if n > numPages then
-                            return (List.rev acc)
-                        else
-                            page <- api (url ^ "?page_number=" ^ show n);
-                            page <- return (@fromJson j page);
-                            loop (n + 1) (List.revAppend page.Records acc)
-                in
-                    loop 2 (List.rev page.Records)
-                end
+            retrieve None []
         end
 
     fun apiPagedOpt [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
         let
-            val j : json {PageCount : option int, Records : list t} =
+            val j : json {NextPageToken : option string, Records : list t} =
                 json_record_withOptional {Records = listLabel}
-                {PageCount = "page_count"}
+                                         {NextPageToken = "next_page_token"}
+
+            fun retrieve tok acc =
+                page <- api (url ^ "?next_page_token=" ^ tok);
+                page <- return (@fromJson j page);
+                case page.NextPageToken of
+                    None => return (List.rev (List.revAppend page.Records acc))
+                  | Some "" => return (List.rev (List.revAppend page.Records acc))
+                  | Some tok => retrieve tok (List.revAppend page.Records acc)
         in
             page <- apiOpt url;
             case page of
                 None => return []
               | Some page =>
                 page <- return (@fromJson j page);
-                case page.PageCount of
+                case page.NextPageToken of
                     None => return page.Records
-                  | Some 1 => return page.Records
-                  | Some numPages =>
-                    let
-                        fun loop n acc =
-                            if n > numPages then
-                                return (List.rev acc)
-                            else
-                                page <- api (url ^ "?page_number=" ^ show n);
-                                page <- return (@fromJson j page);
-                                loop (n + 1) (List.revAppend page.Records acc)
-                    in
-                        loop 2 (List.rev page.Records)
-                    end
+                  | Some "" => return page.Records
+                  | Some tok => retrieve tok (List.rev page.Records)
         end
 
     structure Meetings = struct
