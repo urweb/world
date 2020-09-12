@@ -122,12 +122,14 @@ val _ : json error_response = json_record {Message = "message"}
 
 datatype binop =
          Eq
+       | NotEq
        | And
 
 datatype expr f rf =
          Field of f
        | RField of rf
        | String of string
+       | Null
        | Binop of binop * expr f rf * expr f rf
 
 type exp' (ts :: {Type}) (rts :: {{Type}}) =
@@ -139,18 +141,23 @@ type exp (ts :: {Type}) (rts :: {{Type}}) (t :: Type) =
 
 val field [nm :: Name] [t ::: Type] [r ::: {Type}] [rts ::: {{Type}}] [[nm] ~ r] =
     Field (make [nm] ())
+val rfield [r ::: {Type}] [nm :: Name] [fnm :: Name] [t ::: Type] [ts ::: {Type}] [rts ::: {{Type}}] [[nm] ~ rts] [[fnm] ~ ts] =
+    RField (make [nm] (make [fnm] ()))
 fun string [ts ::: {Type}] [rts ::: {{Type}}] (s : string) =
     String s
+val null [ts ::: {Type}] [rts ::: {{Type}}] =
+    Null
 fun eq [ts ::: {Type}] [rts ::: {{Type}}] [t ::: Type] (a : exp ts rts t) (b : exp ts rts t) =
     Binop (Eq, a, b)
+fun notEq [ts ::: {Type}] [rts ::: {{Type}}] [t ::: Type] (a : exp ts rts t) (b : exp ts rts t) =
+    Binop (NotEq, a, b)
 
 type query (full :: {Type}) (rfull :: {{Type}}) (chosen :: {Type}) =
      {Select : $(map (fn _ => string) full) -> $(map (fn ts => string * $(map (fn _ => string) ts)) rfull) -> string,
       Json : $(map (fn _ => string) full) -> $(map (fn ts => string * $(map (fn _ => string) ts)) rfull)
              -> $(map json full) -> $(map (fn ts => $(map json ts)) rfull)
              -> $(map (fn t => string * json t) chosen),
-      Where : option (expr (variant (map (fn _ => unit) full))
-                           (variant (map (fn ts => variant (map (fn _ => unit) ts)) rfull))),
+      Where : option (exp' full rfull),
       OrderBy : list (variant (map (fn _ => unit) full) * bool)}
 
 fun select [chosen :: {Type}] [unchosen ::: {Type}] [rts ::: {{Type}}] [chosen ~ unchosen] (fl : folder chosen) =
@@ -311,11 +318,13 @@ functor Make(M : sig
         fun formatBinop b =
             case b of
                 Eq => "="
+              | NotEq => "!="
               | And => "AND"
 
         fun allowsParens b =
             case b of
                 Eq => False
+              | NotEq => False
               | And => True
 
         val labels = {Id = "Id"} ++ labels
@@ -330,6 +339,7 @@ functor Make(M : sig
         fun formatExp (e : exp' fields' relations) =
             case e of
                 String s => urlencode ("'" ^ escapeSingleQuotes s ^ "'")
+              | Null => "NULL"
               | Field f => labelOf f
               | RField rf => rlabelOf rf
               | Binop (b, e1, e2) =>

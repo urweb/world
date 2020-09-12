@@ -26,8 +26,12 @@ val show_sfield : show sfield
 con exp :: {Type} (* direct fields *) -> {{Type}} (* fields via relations *) -> Type -> Type
 val field : nm :: Name -> t ::: Type -> r ::: {Type} -> rts ::: {{Type}} -> [[nm] ~ r]
             => exp ([nm = t] ++ r) rts t
+val rfield : r ::: {Type} -> nm :: Name -> fnm :: Name -> t ::: Type -> ts ::: {Type} -> rts ::: {{Type}} -> [[nm] ~ rts] => [[fnm] ~ ts]
+             => exp r ([nm = [fnm = t] ++ ts] ++ rts) t
 val string : ts ::: {Type} -> rts ::: {{Type}} -> string -> exp ts rts string
+val null : ts ::: {Type} -> rts ::: {{Type}} -> exp ts rts string
 val eq : ts ::: {Type} -> rts ::: {{Type}} -> t ::: Type -> exp ts rts t -> exp ts rts t -> exp ts rts bool
+val notEq : ts ::: {Type} -> rts ::: {{Type}} -> t ::: Type -> exp ts rts t -> exp ts rts t -> exp ts rts bool
 
 con query :: {Type} -> {{Type}} -> {Type} -> Type
 val select : chosen :: {Type} -> unchosen ::: {Type} -> rts ::: {{Type}} -> [chosen ~ unchosen]
