@@ -377,7 +377,10 @@ functor Make(M : sig
                                             acc ^ "," ^ formatOrderBy1 ob)
                              (qu ^ "+ORDER+BY+" ^ formatOrderBy1 ob1) obs
             in
-                qu
+                if naughtyDebug ("Salesforce query: " ^ qu) = 0 then
+                    qu
+                else
+                    qu
             end
 
         fun query [chosen] (fl : folder chosen) inst (q : query fields' relations chosen) =
