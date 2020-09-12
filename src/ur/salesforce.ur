@@ -106,9 +106,11 @@ functor ThreeLegged(M : sig
 end
 
 type query_results (r :: Type) = {
-     Records : list r
+     Records : list r,
+     NextRecordsUrl : option string
 }
-fun json_query_results [r] (_ : json r) : json (query_results r) = json_record {Records = "records"}
+fun json_query_results [r] (_ : json r) : json (query_results r) =
+    json_record_withOptional {Records = "records"} {NextRecordsUrl = "nextRecordsUrl"}
 
 type success_response = {
      Id : string
@@ -145,6 +147,10 @@ val rfield [r ::: {Type}] [nm :: Name] [fnm :: Name] [t ::: Type] [ts ::: {Type}
     RField (make [nm] (make [fnm] ()))
 fun string [ts ::: {Type}] [rts ::: {{Type}}] (s : string) =
     String s
+fun stringOpt [ts ::: {Type}] [rts ::: {{Type}}] (so : option string) =
+    case so of
+        None => Null
+      | Some s => String s
 val null [ts ::: {Type}] [rts ::: {{Type}}] =
     Null
 fun eq [ts ::: {Type}] [rts ::: {{Type}}] [t ::: Type] (a : exp ts rts t) (b : exp ts rts t) =
@@ -281,6 +287,7 @@ functor Make(M : sig
         : $([Id = string] ++ r) = r -- #Attributes ++ {Id = idFromUrl r.Attributes.Url}
 
     fun prefix inst = "https://" ^ inst ^ ".salesforce.com/services/data/v47.0/"
+    fun prefixLiteral inst suffix = "https://" ^ inst ^ ".salesforce.com" ^ suffix
     fun record inst id = bless ("https://" ^ inst ^ ".lightning.force.com/lightning/r/" ^ urlencode id ^ "/view")
 
     functor Table(N : sig
@@ -374,14 +381,27 @@ functor Make(M : sig
             end
 
         fun query [chosen] (fl : folder chosen) inst (q : query fields' relations chosen) =
-            s <- api (bless (prefix inst ^ "query?q=" ^ @formatQuery q));
-            return (@fromJson (@json_query_results (@json_record fl
-                                                     (@mp [fn t => string * json t] [json]
-                                                       (fn [t] (p : string * json t) => p.2)
-                                                       fl (q.Json labels rlabels jsons rjsons))
-                                                     (@mp [fn t => string * json t] [fn _ => string]
-                                                       (fn [t] (p : string * json t) => p.1)
-                                                       fl (q.Json labels rlabels jsons rjsons)))) s : query_results $chosen).Records
+            let
+                fun retrieve nextRecordsUrl acc =
+                    s <- api (bless (case nextRecordsUrl of
+                                         None => prefix inst ^ "query?q=" ^ @formatQuery q
+                                       | Some suffix => prefixLiteral inst suffix));
+                    r <- return (@fromJson (@json_query_results (@json_record fl
+                                                                  (@mp [fn t => string * json t] [json]
+                                                                    (fn [t] (p : string * json t) => p.2)
+                                                                    fl (q.Json labels rlabels jsons rjsons))
+                                                                  (@mp [fn t => string * json t] [fn _ => string]
+                                                                    (fn [t] (p : string * json t) => p.1)
+                                                                    fl (q.Json labels rlabels jsons rjsons)))) s : query_results $chosen);
+                    case r.NextRecordsUrl of
+                        Some _ => retrieve r.NextRecordsUrl (List.revAppend r.Records acc)
+                      | None =>
+                        case acc of
+                            [] => return r.Records
+                          | _ => return (List.rev (List.revAppend r.Records acc))
+            in
+                retrieve None []
+            end
 
         fun insert inst vs =
             s <- apiPost (bless (prefix inst ^ "sobjects/" ^ stable ^ "/")) (vs labels jsons);

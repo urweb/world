@@ -29,6 +29,7 @@ val field : nm :: Name -> t ::: Type -> r ::: {Type} -> rts ::: {{Type}} -> [[nm
 val rfield : r ::: {Type} -> nm :: Name -> fnm :: Name -> t ::: Type -> ts ::: {Type} -> rts ::: {{Type}} -> [[nm] ~ rts] => [[fnm] ~ ts]
              => exp r ([nm = [fnm = t] ++ ts] ++ rts) t
 val string : ts ::: {Type} -> rts ::: {{Type}} -> string -> exp ts rts string
+val stringOpt : ts ::: {Type} -> rts ::: {{Type}} -> option string -> exp ts rts (option string)
 val null : ts ::: {Type} -> rts ::: {{Type}} -> exp ts rts string
 val eq : ts ::: {Type} -> rts ::: {{Type}} -> t ::: Type -> exp ts rts t -> exp ts rts t -> exp ts rts bool
 val notEq : ts ::: {Type} -> rts ::: {{Type}} -> t ::: Type -> exp ts rts t -> exp ts rts t -> exp ts rts bool
