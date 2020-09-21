@@ -325,6 +325,7 @@ functor Make(M : AUTH) : sig
 
         structure Registrants : sig
             val list : int (* ID *) -> transaction (list registrant)
+            val add : int (* meeting ID *) -> registrant -> transaction string (* registrant ID *)
         end
     end
 

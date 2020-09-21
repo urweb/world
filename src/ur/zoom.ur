@@ -645,6 +645,11 @@ val _ : json registrant = json_record_withOptional {Email = "email",
                            CreateTime = "create_time",
                            JoinUrl = "join_url"}
 
+type registrant_response = {
+     RegistrantId : string
+}
+val _ : json registrant_response = json_record {RegistrantId = "registrant_id"}
+
 type participant = {
      Id : option string,
      UserId : option string,
@@ -788,6 +793,10 @@ functor Make(M : AUTH) = struct
         structure Registrants = struct
             fun list x =
                 apiPaged "registrants" ("meetings/" ^ show x ^ "/registrants")
+
+            fun add mid p =
+                s <- apiPost ("meetings/" ^ show mid ^ "/registrants") (toJson p);
+                return (fromJson s : registrant_response).RegistrantId
         end
     end
 
