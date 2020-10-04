@@ -430,21 +430,42 @@ functor Make(M : sig
                 None => return ()
               | Some _ => error <xml>Salesforce {[stable]} update failed: {[(fromJson s : error_response).Message]}</xml>
 
-        type multiValues = string
-        val mnil = ""
+        type multiValues = {Building : string,
+                            BuildingSize : int,
+                            Done : list string}
+        val mnil = {Building = "",
+                    BuildingSize = 0,
+                    Done = []}
         fun mcons vs mvs =
-            case mvs of
-                "" => "{\"allOrNone\": true, \"records\": ["
-                      ^ vs.Composite ! labels jsons stable
-              | _ => mvs ^ ", " ^ vs.Composite ! labels jsons stable
+            case mvs.BuildingSize of
+                0 => {Building = "{\"allOrNone\": true, \"records\": ["
+                                 ^ vs.Composite ! labels jsons stable,
+                      BuildingSize = 1,
+                      Done = mvs.Done}
+              | 200 => {Building = "{\"allOrNone\": true, \"records\": ["
+                                   ^ vs.Composite ! labels jsons stable,
+                        BuildingSize = 1,
+                        Done = mvs.Building :: mvs.Done}
+              | _ => {Building = mvs.Building ^ ", " ^ vs.Composite ! labels jsons stable,
+                      BuildingSize = mvs.BuildingSize + 1,
+                      Done = mvs.Done}
 
         fun multiInsert inst mvs =
-            case mvs of
-                "" => return []
-              | _ =>
-                s <- apiPost (bless (prefix inst ^ "composite/sobjects")) (mvs ^ "]}");
-                case String.sindex {Needle = "\"message\"", Haystack = s} of
-                    None => return (List.mp (fn r => r.Id) (fromJson s : composite_response))
-                  | Some _ => error <xml>Salesforce {[stable]} multiInsert failed: {[(fromJson s : error_response).Message]}</xml>
+            let
+                fun inserts mvs acc =
+                    case mvs of
+                        [] => return (List.rev acc)
+                      | s :: mvs' =>
+                        s <- apiPost (bless (prefix inst ^ "composite/sobjects")) (s ^ "]}");
+                        case String.sindex {Needle = "\"message\"", Haystack = s} of
+                            None => inserts mvs' (List.revAppend (List.mp (fn r => r.Id) (fromJson s : composite_response)) acc)
+                          | Some _ => error <xml>Salesforce {[stable]} multiInsert failed: {[(fromJson s : error_response).Message]}</xml>
+
+                val done = case mvs.BuildingSize of
+                               0 => mvs.Done
+                             | _ => mvs.Building :: mvs.Done
+            in
+                inserts (List.rev done) []
+            end
     end
 end
