@@ -117,6 +117,8 @@ type success_response = {
 }
 val _ : json success_response = json_record {Id = "id"}
 
+type composite_response = list success_response
+
 type error_response = {
      Message : string
 }
@@ -232,14 +234,24 @@ fun vproj2 [t1 ::: Type] [t ::: Type] [r ::: {{Type}}] (fl : folder r) (fls : $(
               (fn [ts] fl' (_, r) v => @vproj fl' r v)
               fl fls r)
 
-type values (ts :: {Type}) =
-     $(map (fn _ => string) ts) -> $(map json ts) -> string
+type values (ts :: {Type}) = {
+     Basic : $(map (fn _ => string) ts) -> $(map json ts) -> string,
+     Composite : [[Attributes] ~ ts] => $(map (fn _ => string) ts) -> $(map json ts) -> string (* type *) -> string
+}
 
 fun values [chosen ::: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen]
-           (fl : folder chosen) (r : $chosen)
-           (labels : $(map (fn _ => string) (chosen ++ unchosen)))
-           (jsons : $(map json (chosen ++ unchosen))) =
-  @toJson (@json_record fl (jsons --- _) (labels --- _)) r
+           (fl : folder chosen) (r : $chosen) = {
+    Basic = fn (labels : $(map (fn _ => string) (chosen ++ unchosen)))
+                   (jsons : $(map json (chosen ++ unchosen))) =>
+               @toJson (@json_record fl (jsons --- _) (labels --- _)) r,
+    Composite = fn [[Attributes] ~ (chosen ++ unchosen)]
+                       (labels : $(map (fn _ => string) (chosen ++ unchosen)))
+                       (jsons : $(map json (chosen ++ unchosen))) ty =>
+                   @toJson (@json_record (@Folder.cons [#Attributes] [_] ! fl)
+                             (jsons --- _ ++ {Attributes = json_record {Typ = "type"}})
+                             (labels --- _ ++ {Attributes = "attributes"}))
+                    (r ++ {Attributes = {Typ = ty}})
+}
 
 functor Make(M : sig
                  val token : transaction (option string)
@@ -259,14 +271,17 @@ functor Make(M : sig
 
     fun api url =
         tok <- token;
+        debug ("Salesforce GET: " ^ show url);
         logged (WorldFfi.get url (Some ("Bearer " ^ tok)) False)
 
     fun apiPost url body =
         tok <- token;
+        debug ("Salesforce POST: " ^ show url ^ " - " ^ body);
         logged (WorldFfi.post url (Some ("Bearer " ^ tok)) (Some "application/json") body)
 
     fun apiPatch url body =
         tok <- token;
+        debug ("Salesforce PATCH: " ^ show url ^ " - " ^ body);
         logged (WorldFfi.patch url (Some ("Bearer " ^ tok)) (Some "application/json") body)
 
     fun idFromUrl url =
@@ -293,7 +308,7 @@ functor Make(M : sig
     functor Table(N : sig
                       val stable : stable
                       con fields :: {Type}
-                      constraint [Id] ~ fields
+                      constraint [Id, Attributes] ~ fields
                       val labels : $(map (fn _ => string) fields)
                       val jsons : $(map json fields)
                       val fl : folder fields
@@ -377,10 +392,7 @@ functor Make(M : sig
                                             acc ^ "," ^ formatOrderBy1 ob)
                              (qu ^ "+ORDER+BY+" ^ formatOrderBy1 ob1) obs
             in
-                if naughtyDebug ("Salesforce query: " ^ qu) = 0 then
-                    qu
-                else
-                    qu
+                qu
             end
 
         fun query [chosen] (fl : folder chosen) inst (q : query fields' relations chosen) =
@@ -407,15 +419,32 @@ functor Make(M : sig
             end
 
         fun insert inst vs =
-            s <- apiPost (bless (prefix inst ^ "sobjects/" ^ stable ^ "/")) (vs labels jsons);
+            s <- apiPost (bless (prefix inst ^ "sobjects/" ^ stable ^ "/")) (vs.Basic labels jsons);
             case String.sindex {Needle = "\"message\"", Haystack = s} of
                 None => return (fromJson s : success_response).Id
               | Some _ => error <xml>Salesforce {[stable]} insert failed: {[(fromJson s : error_response).Message]}</xml>
 
         fun update inst id vs =
-            s <- apiPatch (bless (prefix inst ^ "sobjects/" ^ stable ^ "/" ^ Urls.urlencode id)) (vs labels jsons);
+            s <- apiPatch (bless (prefix inst ^ "sobjects/" ^ stable ^ "/" ^ Urls.urlencode id)) (vs.Basic labels jsons);
             case String.sindex {Needle = "\"message\"", Haystack = s} of
                 None => return ()
               | Some _ => error <xml>Salesforce {[stable]} update failed: {[(fromJson s : error_response).Message]}</xml>
+
+        type multiValues = string
+        val mnil = ""
+        fun mcons vs mvs =
+            case mvs of
+                "" => "{\"allOrNone\": true, \"records\": ["
+                      ^ vs.Composite ! labels jsons stable
+              | _ => mvs ^ ", " ^ vs.Composite ! labels jsons stable
+
+        fun multiInsert inst mvs =
+            case mvs of
+                "" => return []
+              | _ =>
+                s <- apiPost (bless (prefix inst ^ "composite/sobjects")) (mvs ^ "]}");
+                case String.sindex {Needle = "\"message\"", Haystack = s} of
+                    None => return (List.mp (fn r => r.Id) (fromJson s : composite_response))
+                  | Some _ => error <xml>Salesforce {[stable]} multiInsert failed: {[(fromJson s : error_response).Message]}</xml>
     end
 end
