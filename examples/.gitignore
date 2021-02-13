@@ -4,3 +4,4 @@ basic_in.ur
 slackSecrets.ur
 zoomSecrets.ur
 oidcSecrets.ur
+dropboxSecrets.ur

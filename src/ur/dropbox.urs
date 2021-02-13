@@ -47,6 +47,8 @@ type file_request = {
 
 functor Make(M : AUTH) : sig
     structure FileRequests : sig
+        val list : transaction (list file_request)
+        val get : file_request_id -> transaction file_request
         val create : file_request_parameters -> transaction file_request
     end
 end

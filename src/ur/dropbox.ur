@@ -82,6 +82,30 @@ val _ : json file_request = json_record_withOptional
                              Deadline = "deadline",
                              Description = "description"}
 
+type cursor = {
+     Cursor : string
+}
+val _ : json cursor = json_record {Cursor = "cursor"}
+
+type file_requests = {
+     FileRequests : list file_request,
+     Cursor : string,
+     HasMore : bool
+}
+val _ : json file_requests = json_record {FileRequests = "file_requests",
+                                          Cursor = "cursor",
+                                          HasMore = "has_more"}
+
+type limit = {
+     Limit : int
+}
+val _ : json limit = json_record {Limit = "limit"}
+
+type id = {
+     Id : string
+}
+val _ : json id = json_record {Id = "id"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -98,21 +122,33 @@ functor Make(M : AUTH) = struct
         debug ("Dropbox response: " ^ show v);
         return v
 
-    fun api url =
-        tok <- token;
-        logged (WorldFfi.get (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False)
-
-    fun apiOpt url =
-        tok <- token;
-        logged (WorldFfi.getOpt (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False)
-
-    fun apiPost url body =
+    fun api url body =
         tok <- token;
         logged (WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) (Some "application/json") body)
 
     structure FileRequests = struct
+        val list =
+            let
+                fun list' cursor =
+                    r <- (case cursor of
+                              None => api "file_requests/list_v2" (toJson {Limit = 1000})
+                            | Some c => api "list/continue" (toJson {Cursor = c}));
+                    r <- return (fromJson r : file_requests);
+                    if r.HasMore then
+                        rest <- list' (Some r.Cursor);
+                        return (List.append r.FileRequests rest)
+                    else
+                        return r.FileRequests
+            in
+                list' None
+            end
+
+        fun get id =
+            r <- api "file_requests/get" (toJson {Id = id});
+            return (fromJson r)
+
         fun create p =
-            r <- apiPost "file_requests/create" (toJson p);
+            r <- api "file_requests/create" (toJson p);
             return (fromJson r)
     end
 end

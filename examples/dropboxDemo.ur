@@ -9,12 +9,32 @@ fun create r =
                                     ++ Api.optionals {});
     return <xml><body>ID: {[m.Id]}</body></xml>
 
-val main = return <xml><body>
-  <h3>Create Request</h3>
+fun req id =
+    r <- D.FileRequests.get id;
+    return <xml><body>
+      Title: {[r.Title]}<br/>
+      URL: {[r.Url]}<br/>
+      Created: {[r.Created]}<br/>
+      Open: {[r.IsOpen]}<br/>
+      FileCount: {[r.FileCount]}<br/>
+      Destination: {[r.Destination]}<br/>
+      Description: {[r.Description]}
+    </body></xml>
 
-  <form>
-    Title: <textbox{#Title}/><br/>
-    Destination: <textbox{#Destination}/><br/>
-    <submit action={create}/>
-  </form>
-</body></xml>
+val main =
+    rs <- D.FileRequests.list;
+    return <xml><body>
+      <h3>Requests</h3>
+
+      <ul>
+        {List.mapX (fn r => <xml><li><a link={req r.Id}>{[r.Title]}</a> <i>({[r.Created]}, {[r.FileCount]})</i> <a href={bless r.Url}>[Upload]</a></li></xml>) rs}
+      </ul>
+
+      <h3>Create Request</h3>
+
+      <form>
+        Title: <textbox{#Title}/><br/>
+        Destination: <textbox{#Destination}/><br/>
+        <submit action={create}/>
+      </form>
+    </body></xml>
