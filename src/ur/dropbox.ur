@@ -152,24 +152,36 @@ val _ : json list_folder_parameters = json_record_withOptional
                                        IncludePropertyGroups = "include_property_groups",
                                        IncludeNonDownloadableFiles = "include_non_downloadable_files"}
 
-type file = {
+type metadata = {
      Nam : string,
      PathLower : option string,
      PathDisplay : option string
 }
-val _ : json file = json_record_withOptional
-                        {Nam = "name"}
-                        {PathLower = "path_lower",
-                         PathDisplay = "path_display"}
+val _ : json metadata = json_record_withOptional
+                            {Nam = "name"}
+                            {PathLower = "path_lower",
+                             PathDisplay = "path_display"}
 
 type files = {
-     Entries : list file,
+     Entries : list metadata,
      Cursor : string,
      HasMore : bool
 }
 val _ : json files = json_record {Entries = "entries",
                                   Cursor = "cursor",
                                   HasMore = "has_more"}
+
+type temporary_link = {
+     Metadata : metadata,
+     Link : string
+}
+val _ : json temporary_link = json_record {Metadata = "metadata",
+                                           Link = "link"}
+
+type path = {
+     Path : string
+}
+val _ : json path = json_record {Path = "path"}
 
 functor Make(M : AUTH) = struct
     open M
@@ -233,5 +245,9 @@ functor Make(M : AUTH) = struct
             in
                 list' None
             end
+
+        fun getTemporaryLink p =
+            r <- api "files/get_temporary_link" (toJson {Path = p});
+            return (fromJson r)
     end
 end

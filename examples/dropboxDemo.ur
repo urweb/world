@@ -8,6 +8,10 @@ fun create r =
                                     ++ Api.optionals {});
     return <xml><body>ID: {[m.Id]}</body></xml>
 
+fun download path =
+    r <- D.Files.getTemporaryLink path;
+    redirect (bless r.Link)
+
 fun req id =
     r <- D.FileRequests.get id;
     fs <- (case r.Destination of
@@ -25,7 +29,9 @@ fun req id =
       <h4>Files</h4>
 
       <ul>
-        {List.mapX (fn f => <xml><li>{[f.Nam]} ({[f.PathDisplay]})</li></xml>) fs}
+        {List.mapX (fn f => <xml><li>{case f.PathDisplay of
+                                          None => <xml>{[f.Nam]}</xml>
+                                        | Some p => <xml><a link={download p}>{[f.Nam]}</a></xml>} ({[f.PathDisplay]})</li></xml>) fs}
       </ul>
     </body></xml>
 

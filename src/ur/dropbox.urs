@@ -65,10 +65,15 @@ type list_folder_parameters = {
      IncludeNonDownloadableFiles : option bool
 }
 
-type file = {
+type metadata = {
      Nam : string,
      PathLower : option string,
      PathDisplay : option string
+}
+
+type temporary_link = {
+     Metadata : metadata,
+     Link : string
 }
 
 functor Make(M : AUTH) : sig
@@ -79,6 +84,7 @@ functor Make(M : AUTH) : sig
     end
 
     structure Files : sig
-        val listFolder : list_folder_parameters -> transaction (list file)
+        val listFolder : list_folder_parameters -> transaction (list metadata)
+        val getTemporaryLink : string (* path *) -> transaction temporary_link
     end
 end
