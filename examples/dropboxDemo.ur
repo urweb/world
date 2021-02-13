@@ -9,8 +9,10 @@ fun create r =
     return <xml><body>ID: {[m.Id]}</body></xml>
 
 fun download path =
-    r <- D.Files.getTemporaryLink path;
-    redirect (bless r.Link)
+    u <- D.Sharing.createSharedLinkWithSettings {Path = path,
+                                                 Settings = Api.optionals {RequestedVisibility = Dropbox.VisPublic,
+                                                                           Access = Dropbox.Viewer}};
+    redirect (bless u)
 
 fun req id =
     r <- D.FileRequests.get id;

@@ -183,6 +183,81 @@ type path = {
 }
 val _ : json path = json_record {Path = "path"}
 
+datatype requested_visibility =
+         VisPublic
+       | VisTeamOnly
+       | VisPassword
+val _ : json requested_visibility = json_derived
+                                    (fn x =>
+                                        case x of
+                                            "public" => VisPublic
+                                          | "team_only" => VisTeamOnly
+                                          | "password" => VisPassword
+                                          | _ => error <xml>Bad Dropbox visibility {[x]}</xml>)
+                                    (fn x =>
+                                        case x of
+                                            VisPublic => "public"
+                                          | VisTeamOnly => "team_only"
+                                          | VisPassword => "password")
+
+datatype link_audience =
+         AudPublic
+       | AudTeam
+       | AudNoOne
+       | AudPassword
+val _ : json link_audience = json_derived
+                             (fn x =>
+                                 case x of
+                                     "public" => AudPublic
+                                   | "team" => AudTeam
+                                   | "no_one" => AudNoOne
+                                   | "password" => AudPassword
+                                   | _ => error <xml>Bad Dropbox audience {[x]}</xml>)
+                             (fn x =>
+                                 case x of
+                                     AudPublic => "public"
+                                   | AudTeam => "team"
+                                   | AudNoOne => "no_one"
+                                   | AudPassword => "password")
+
+datatype requested_link_access_level =
+         Viewer
+       | Editor
+       | Max
+val _ : json requested_link_access_level = json_derived
+                                           (fn x =>
+                                               case x of
+                                                   "viewer" => Viewer
+                                                 | "editor" => Editor
+                                                 | "max" => Max
+                                                 | _ => error <xml>Bad Dropbox access level {[x]}</xml>)
+                                           (fn x =>
+                                               case x of
+                                                   Viewer => "viewer"
+                                                 | Editor => "editor"
+                                                 | Max => "max")
+
+type shared_link_settings = {
+     RequestedVisibility : option requested_visibility,
+     LinkPassword : option string,
+     Expires : option time,
+     Audience : option link_audience,
+     Access : option requested_link_access_level
+}
+val _ : json shared_link_settings = json_record_withOptional {}
+                                    {RequestedVisibility = "requested_visibility",
+                                     LinkPassword = "link_password",
+                                     Expires = "expires",
+                                     Audience = "audience",
+                                     Access = "access"}
+
+type shared_link_parameters = {
+     Path : string,
+     Settings : shared_link_settings
+}
+val _ : json shared_link_parameters = json_record {Path = "path",
+                                                   Settings = "settings"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -249,5 +324,11 @@ functor Make(M : AUTH) = struct
         fun getTemporaryLink p =
             r <- api "files/get_temporary_link" (toJson {Path = p});
             return (fromJson r)
+    end
+
+    structure Sharing = struct
+        fun createSharedLinkWithSettings p =
+            r <- api "sharing/create_shared_link_with_settings" (toJson p);
+            return (fromJson r : shared_link).Url
     end
 end

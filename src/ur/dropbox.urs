@@ -76,6 +76,35 @@ type temporary_link = {
      Link : string
 }
 
+datatype requested_visibility =
+         VisPublic
+       | VisTeamOnly
+       | VisPassword
+
+datatype link_audience =
+         AudPublic
+       | AudTeam
+       | AudNoOne
+       | AudPassword
+
+datatype requested_link_access_level =
+         Viewer
+       | Editor
+       | Max
+
+type shared_link_settings = {
+     RequestedVisibility : option requested_visibility,
+     LinkPassword : option string,
+     Expires : option time,
+     Audience : option link_audience,
+     Access : option requested_link_access_level
+}
+
+type shared_link_parameters = {
+     Path : string,
+     Settings : shared_link_settings
+}
+
 functor Make(M : AUTH) : sig
     structure FileRequests : sig
         val list : transaction (list file_request)
@@ -86,5 +115,9 @@ functor Make(M : AUTH) : sig
     structure Files : sig
         val listFolder : list_folder_parameters -> transaction (list metadata)
         val getTemporaryLink : string (* path *) -> transaction temporary_link
+    end
+
+    structure Sharing : sig
+        val createSharedLinkWithSettings : shared_link_parameters -> transaction string (* url *)
     end
 end
