@@ -29,7 +29,7 @@ type file_request_parameters = {
      Title : string,
      Destination : string,
      Deadline : option file_request_deadline,
-     Open : bool,
+     Open : option bool,
      Description : option string
 }
 
@@ -45,10 +45,40 @@ type file_request = {
      Description : option string
 }
 
+type shared_link = {
+     Url : string,
+     Password : option string
+}
+
+datatype template_filter_base =
+         FilterSome of list string
+
+type list_folder_parameters = {
+     Path : string,
+     Recursive : option bool,
+     IncludeDeleted : option bool,
+     IncludeHasExplicitSharedMembers : option bool,
+     IncludeMountedFolders : option bool,
+     Limit : option int,
+     SharedLink : option shared_link,
+     IncludePropertyGroups : option template_filter_base,
+     IncludeNonDownloadableFiles : option bool
+}
+
+type file = {
+     Nam : string,
+     PathLower : option string,
+     PathDisplay : option string
+}
+
 functor Make(M : AUTH) : sig
     structure FileRequests : sig
         val list : transaction (list file_request)
         val get : file_request_id -> transaction file_request
         val create : file_request_parameters -> transaction file_request
+    end
+
+    structure Files : sig
+        val listFolder : list_folder_parameters -> transaction (list file)
     end
 end

@@ -50,14 +50,14 @@ type file_request_parameters = {
      Title : string,
      Destination : string,
      Deadline : option file_request_deadline,
-     Open : bool,
+     Open : option bool,
      Description : option string
 }
 val _ : json file_request_parameters = json_record_withOptional
                                        {Title = "title",
-                                        Destination = "destination",
-                                        Open = "open"}
+                                        Destination = "destination"}
                                        {Deadline = "deadline",
+                                        Open = "open",
                                         Description = "description"}
 
 type file_request = {
@@ -106,6 +106,71 @@ type id = {
 }
 val _ : json id = json_record {Id = "id"}
 
+type shared_link = {
+     Url : string,
+     Password : option string
+}
+val _ : json shared_link = json_record_withOptional {Url = "url"}
+                                                    {Password = "password"}
+
+type template_filter_base' = {
+     Tag : string,
+     FilterSome : list string
+}
+val _ : json template_filter_base' = json_record {Tag = ".tag",
+                                                  FilterSome = "filter_some"}
+
+datatype template_filter_base =
+         FilterSome of list string
+val _ : json template_filter_base = json_derived
+                                    (fn x =>
+                                        case x.Tag of
+                                            "filter_some" => FilterSome x.FilterSome
+                                          | _ => error <xml>Bad Dropbox filter {[x.Tag]}</xml>)
+                                    (fn (FilterSome x) => {Tag = ".filter_some",
+                                                           FilterSome = x})
+
+type list_folder_parameters = {
+     Path : string,
+     Recursive : option bool,
+     IncludeDeleted : option bool,
+     IncludeHasExplicitSharedMembers : option bool,
+     IncludeMountedFolders : option bool,
+     Limit : option int,
+     SharedLink : option shared_link,
+     IncludePropertyGroups : option template_filter_base,
+     IncludeNonDownloadableFiles : option bool
+}
+val _ : json list_folder_parameters = json_record_withOptional
+                                      {Path = "path"}
+                                      {Recursive = "recursive",
+                                       IncludeDeleted = "include_deleted",
+                                       IncludeHasExplicitSharedMembers = "include_has_explicit_shared_members",
+                                       IncludeMountedFolders = "include_mounted_folders",
+                                       Limit = "limit",
+                                       SharedLink = "shared_link",
+                                       IncludePropertyGroups = "include_property_groups",
+                                       IncludeNonDownloadableFiles = "include_non_downloadable_files"}
+
+type file = {
+     Nam : string,
+     PathLower : option string,
+     PathDisplay : option string
+}
+val _ : json file = json_record_withOptional
+                        {Nam = "name"}
+                        {PathLower = "path_lower",
+                         PathDisplay = "path_display"}
+
+type files = {
+     Entries : list file,
+     Cursor : string,
+     HasMore : bool
+}
+val _ : json files = json_record {Entries = "entries",
+                                  Cursor = "cursor",
+                                  HasMore = "has_more"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -150,5 +215,23 @@ functor Make(M : AUTH) = struct
         fun create p =
             r <- api "file_requests/create" (toJson p);
             return (fromJson r)
+    end
+
+    structure Files = struct
+        fun listFolder p =
+            let
+                fun list' cursor =
+                    r <- (case cursor of
+                              None => api "files/list_folder" (toJson p)
+                            | Some c => api "files/list_folder/continue" (toJson {Cursor = c}));
+                    r <- return (fromJson r : files);
+                    if r.HasMore then
+                        rest <- list' (Some r.Cursor);
+                        return (List.append r.Entries rest)
+                    else
+                        return r.Entries
+            in
+                list' None
+            end
     end
 end

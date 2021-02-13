@@ -4,13 +4,15 @@ structure D = Dropbox.Make(Dropbox.TwoLegged(DropboxSecrets))
 
 fun create r =
     m <- D.FileRequests.create ({Title = r.Title,
-                                 Destination = r.Destination,
-                                 Open = True}
+                                 Destination = r.Destination}
                                     ++ Api.optionals {});
     return <xml><body>ID: {[m.Id]}</body></xml>
 
 fun req id =
     r <- D.FileRequests.get id;
+    fs <- (case r.Destination of
+               None => return []
+             | Some d => D.Files.listFolder ({Path = d} ++ Api.optionals {}));
     return <xml><body>
       Title: {[r.Title]}<br/>
       URL: {[r.Url]}<br/>
@@ -19,6 +21,12 @@ fun req id =
       FileCount: {[r.FileCount]}<br/>
       Destination: {[r.Destination]}<br/>
       Description: {[r.Description]}
+
+      <h4>Files</h4>
+
+      <ul>
+        {List.mapX (fn f => <xml><li>{[f.Nam]} ({[f.PathDisplay]})</li></xml>) fs}
+      </ul>
     </body></xml>
 
 val main =
