@@ -1,0 +1,10 @@
+library ../src/ur
+rewrite all DropboxDemo/*
+database dbname=dropboxDemo
+sql dropboxDemo.sql
+safeGetDefault
+allow url https://*
+prefix http://localhost:8080/
+
+dropboxSecrets
+dropboxDemo

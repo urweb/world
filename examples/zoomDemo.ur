@@ -1,4 +1,4 @@
-(* For this demo, it's necessary to create zoomSecrets.urs,
+(* For this demo, it's necessary to create zoomSecrets.ur,
  * defining [api_key] and [api_secret]. *)
 (*structure Z = Zoom.Make(Zoom.TwoLegged(ZoomSecrets))*)
 
