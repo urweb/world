@@ -14,6 +14,8 @@ val _ : json status = json_derived
                                 | "submitted" => Submitted
                                 | "Accepted" => Accepted
                                 | "Rejected" => Rejected
+                                | "accepted" => Accepted
+                                | "rejected" => Rejected
                                 | _ => error <xml>Bad HotCRP paper status {[x]}</xml>)
                           (fn x =>
                               case x of
