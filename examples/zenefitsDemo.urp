@@ -1,0 +1,10 @@
+library ../src/ur
+rewrite all ZenefitsDemo/*
+database dbname=zenefitsDemo
+sql zenefitsDemo.sql
+safeGetDefault
+allow url https://*
+prefix http://localhost:8080/
+
+zenefitsSecrets
+zenefitsDemo

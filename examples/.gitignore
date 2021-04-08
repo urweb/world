@@ -1,7 +1,4 @@
 basic_in.ur
 *.exe
 *.sql
-slackSecrets.ur
-zoomSecrets.ur
-oidcSecrets.ur
-dropboxSecrets.ur
+*Secrets.ur
