@@ -4,14 +4,19 @@ functor TwoLegged(M : sig
     val token : transaction (option string)
 end
 
-(** * Person API records *)
+(** * API records *)
 
 type person = {
+     Id : string,
      FirstName : option string,
      PreferredName : option string,
      LastName : option string,
      WorkEmail : option string,
      PersonalEmail : option string
+}
+
+type employment = {
+     AnnualSalary : option string
 }
 
 (** * Now for the actual methods.... *)
@@ -21,5 +26,9 @@ functor Make(M : sig
              end) : sig
     structure People : sig
         val list : transaction (list person)
+    end
+
+    structure Employments : sig
+        val ofPerson : string -> transaction (list employment)
     end
 end

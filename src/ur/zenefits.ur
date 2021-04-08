@@ -10,6 +10,7 @@ functor TwoLegged(M : sig
 end
 
 type person = {
+     Id : string,
      FirstName : option string,
      PreferredName : option string,
      LastName : option string,
@@ -17,11 +18,18 @@ type person = {
      PersonalEmail : option string
 }
 val _ : json person = json_record
-                          {FirstName = "first_name",
+                          {Id = "id",
+                           FirstName = "first_name",
                            PreferredName = "preferred_name",
                            LastName = "last_name",
                            WorkEmail = "work_email",
                            PersonalEmail = "personal_email"}
+
+type employment = {
+     AnnualSalary : option string
+}
+val _ : json employment = json_record
+                          {AnnualSalary = "annual_salary"}
 
 type subresults a = {
      Data : list a,
@@ -66,5 +74,9 @@ functor Make(M : sig
 
     structure People = struct
         val list = apiPaged "core/people"
+    end
+
+    structure Employments = struct
+        fun ofPerson p = apiPaged ("core/people/" ^ urlencode p ^ "/employments")
     end
 end
