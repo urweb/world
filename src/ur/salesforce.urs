@@ -13,6 +13,7 @@ functor ThreeLegged(M : sig
                     end) : sig
     val token : transaction (option string)
     val status : transaction xbody
+    val logout : transaction unit
 end
 
 type stable (* a kind of SObject, e.g. Account, Contact *)

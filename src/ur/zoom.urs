@@ -31,6 +31,7 @@ functor ThreeLegged(M : sig
     val token : transaction (option string)
     val authorize : transaction page
     val status : transaction xbody
+    val logout : transaction unit
 end
 
 datatype meeting_type =
