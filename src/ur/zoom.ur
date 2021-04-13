@@ -936,6 +936,7 @@ functor ThreeLegged(M : sig
                         val scope = Some (Scope.toString scopes)
                         val nameForScopeParameter = None
                         val parseTokenResponse = None
+                        val hosted_domain = None
                     end)
 
     val token =

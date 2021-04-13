@@ -5,6 +5,8 @@ signature S = sig
     val client_id : string
     val client_secret : string
     val scope : option string
+    val hosted_domain : option string (* a hint on which e-mail addresses to accept,
+                                       * via giving one domain *)
 
     val withToken : {Token : string, Expiration : option int (* seconds from now *)} -> transaction unit
     val onCompletion : transaction page (* run this after we're logged in, e.g. to return to the page where the user asked to log in *)

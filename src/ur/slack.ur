@@ -75,6 +75,7 @@ functor ThreeLegged(M : sig
                         val withToken = withToken
                         val scope = Some (Scope.toString scopes)
                         val nameForScopeParameter = Some "user_scope"
+                        val hosted_domain = None
 
                         type token_response = {
                              AuthedUser : { Token : string }

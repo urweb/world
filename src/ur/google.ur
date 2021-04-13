@@ -104,9 +104,23 @@ functor TwoLegged(M : sig
             return (Some resp.AccessToken)
 end
 
+(** * Profile types *)
+
+type email_address = { Value : string }
+val _ : json email_address = json_record {Value = "value"}
+
+type name = { DisplayName : string }
+val _ : json name = json_record {DisplayName = "displayName"}
+
+type profile = { EmailAddresses : list email_address,
+                 Names : option (list name) }
+val _ : json profile = json_record_withOptional {EmailAddresses = "emailAddresses"}
+                                                {Names = "names"}
+
 functor ThreeLegged(M : sig
                         val client_id : string
                         val client_secret : string
+                        val hosted_domain : option string
                         val https : bool
 
                         val scopes : Scope.t
@@ -129,6 +143,20 @@ functor ThreeLegged(M : sig
     cookie user : int
 
     fun withToken {Token = tok, Expiration = seconds, ...} =
+        (case hosted_domain of
+             None => return ()
+           | Some dom =>
+             s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses") (Some ("Bearer " ^ tok)) False;
+             case (fromJson s : profile).EmailAddresses of
+                 [] => error <xml>No e-mail addresses in Google profile.</xml>
+               | {Value = addr} :: _ =>
+                 case String.split addr #"@" of
+                     None => error <xml>Invalid e-mail address in Google profile</xml>
+                   | Some (_, dom') =>
+                     if dom' <> dom then
+                         error <xml>Google e-mail address is not in the required domain {[dom]}</xml>
+                     else
+                         return ());
         case seconds of
             None => error <xml>Missing token expiration in OAuth response</xml>
           | Some seconds =>
@@ -190,19 +218,6 @@ functor ThreeLegged(M : sig
                                                onclick={fn _ => redirect (url authorize)}/></xml>}/>
         </xml>
 end
-
-(** * Profile types *)
-
-type email_address = { Value : string }
-val _ : json email_address = json_record {Value = "value"}
-
-type name = { DisplayName : string }
-val _ : json name = json_record {DisplayName = "displayName"}
-
-type profile = { EmailAddresses : list email_address,
-                 Names : option (list name) }
-val _ : json profile = json_record_withOptional {EmailAddresses = "emailAddresses"}
-                                                {Names = "names"}
 
 (** * Gmail types *)
 
@@ -277,17 +292,17 @@ type hmessage = {
 val _ : json hmessage = json_record {Id = "id",
                                      ThreadId = "threadId",
                                      LabelIds = "labelIds"}
-                                
+
 type ma_item = {
      Message : hmessage
 }
 val _ : json ma_item = json_record {Message = "message"}
-                                
+
 type history_item = {
      MessagesAdded : list ma_item
 }
 val _ : json history_item = json_record {MessagesAdded = "messagesAdded"}
-                                
+
 type history = {
      History : list history_item,
      HistoryId : history_id
@@ -305,7 +320,7 @@ type calendar_id = string
 val show_calendar_id = _
 val read_calendar_id = _
 val eq_calendar_id = _
-                       
+
 type calendar = {
      Id : calendar_id,
      Summary : string,

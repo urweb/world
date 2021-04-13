@@ -40,6 +40,7 @@ functor TwoLegged(M : sig
 functor ThreeLegged(M : sig
                         val client_id : string
                         val client_secret : string
+                        val hosted_domain : option string (* force e-mail here? *)
                         val https : bool
 
                         val scopes : Scope.t

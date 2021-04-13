@@ -8,6 +8,7 @@ signature S = sig
     val client_id : string
     val client_secret : string
     val scope : option string
+    val hosted_domain : option string
 
     val withToken : {Token : string, Expiration : option int} -> transaction unit
     val onCompletion : transaction page
@@ -151,6 +152,9 @@ functor Make(M : S) = struct
                              ^ (case scope of
                                     None => ""
                                   | Some scope => "&" ^ Option.get "scope" nameForScopeParameter
-                                                  ^ "=" ^ urlencode scope)))
+                                                  ^ "=" ^ urlencode scope)
+                             ^ (case hosted_domain of
+                                    None => ""
+                                  | Some hd => "&hd=" ^ urlencode hd)))
         end
 end

@@ -60,6 +60,7 @@ functor ThreeLegged(M : sig
                         val authorize_url = bless (url_base ^ "authorize")
                         val access_token_url = bless (url_base ^ "token")
                         val scope = None
+                        val hosted_domain = None
 
                         val withToken = withToken
                         val nameForScopeParameter = None

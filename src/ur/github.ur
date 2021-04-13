@@ -110,6 +110,7 @@ functor Make(M : S) = struct
                         val scope = None
                         val nameForScopeParameter = None
                         val parseTokenResponse = None
+                        val hosted_domain = None
                     end)
 
     val whoami =
