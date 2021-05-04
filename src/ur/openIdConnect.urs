@@ -6,6 +6,7 @@ signature S = sig
     val client_secret : string
     val https : bool
     val onCompletion : transaction page
+    val scopeValue : option string (* if present, pass to authorization endpoint *)
 end
 
 functor Make(M : S) : sig

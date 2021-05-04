@@ -15,6 +15,7 @@ signature S = sig
     val client_secret : string
     val https : bool
     val onCompletion : transaction page
+    val scopeValue : option string
 end
 
 type claims = {
@@ -84,8 +85,8 @@ functor Make(M : S) = struct
                         open M
 
                         val withToken = withToken
-                        val scope = None
-                        val nameForScopeParameter = None
+                        val scope = scopeValue
+                        val nameForScopeParameter = case scopeValue of None => None | Some _ => Some "scope"
                         val parseTokenResponse = None
                         val hosted_domain = None
                     end)
