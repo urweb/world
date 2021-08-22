@@ -19,6 +19,7 @@ dropbox
 github
 google
 hotcrp
+influxdb
 salesforce
 slack
 zoom

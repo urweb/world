@@ -1,4 +1,4 @@
-(* For this demo, it's necessary to create zenefitsScrets.ur,
+(* For this demo, it's necessary to create zenefitsSecrets.ur,
  * defining [api_token]. *)
 structure Z = Zenefits.Make(Zenefits.TwoLegged(ZenefitsSecrets))
 

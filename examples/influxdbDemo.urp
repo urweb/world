@@ -1,0 +1,10 @@
+library ../src/ur
+rewrite all InfluxdbDemo/*
+database dbname=influxdbDemo
+sql influxdbDemo.sql
+safeGetDefault
+allow url http://*
+allow url https://*
+
+influxdbSecrets
+influxdbDemo

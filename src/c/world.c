@@ -51,9 +51,16 @@ uw_Basis_int uw_WorldFfi_lastErrorCode(uw_context ctx) {
   else return 200;
 }
 
+static int allow_http = 0;
+
+uw_Basis_unit uw_WorldFfi_allowHttp(uw_context ctx) {
+  allow_http = 1;
+  return uw_unit_v;
+}
+
 // Returns 1 on "not found".
 static int doweb(uw_context ctx, uw_buffer *buf, CURL *c, uw_Basis_string url, int encode_errors, int special_case_404) {
-  if (strncmp(url, "https://", 8))
+  if (strncmp(url, "https://", 8) && (!allow_http || strncmp(url, "http://", 7)))
     uw_error(ctx, FATAL, "World: URL is not HTTPS");
 
   ctx_buffer cb = {ctx, buf};
