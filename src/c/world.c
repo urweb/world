@@ -10,6 +10,8 @@
 #include <openssl/pem.h>
 #include <openssl/hmac.h>
 
+#include <libscrypt.h>
+
 #include <urweb.h>
 #include <world.h>
 
@@ -298,6 +300,22 @@ uw_WorldFfi_signatur uw_WorldFfi_sign_hs256(uw_context ctx, uw_Basis_string key,
   if (!HMAC(md, key, strlen(key), (unsigned char *)message, strlen(message),
             (unsigned char *)sig.bytes, (unsigned int *)&sig.len))
     uw_error(ctx, FATAL, "World: HMAC failed");
+
+  return sig;
+}
+
+#define SCRYPT_OUTPUT_SIZE 32
+
+uw_WorldFfi_signatur uw_WorldFfi_scrypt(uw_context ctx, uw_Basis_string passwd, uw_Basis_string salt) {
+  uw_WorldFfi_signatur sig;
+  sig.len = SCRYPT_OUTPUT_SIZE;
+  sig.bytes = uw_malloc(ctx, SCRYPT_OUTPUT_SIZE);
+
+  if (libscrypt_scrypt((const unsigned char *)passwd, strlen(passwd),
+                       (const unsigned char *)salt, strlen(salt),
+                       1024, 1, 1,
+                       (unsigned char *)sig.bytes, SCRYPT_OUTPUT_SIZE))
+    uw_error(ctx, FATAL, "World: scrypt failed");
 
   return sig;
 }

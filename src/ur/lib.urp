@@ -1,6 +1,6 @@
 library config
 ffi worldFfi
-link -lurweb_world
+link -lurweb_world -lscrypt
 effectful WorldFfi.post
 
 $/char
@@ -20,6 +20,7 @@ github
 google
 hotcrp
 influxdb
+passwords
 salesforce
 slack
 zoom

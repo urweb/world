@@ -17,5 +17,8 @@ val sign_rs256 : string (* key, in PEM format *)
 val sign_hs256 : string (* key, in PEM format *)
                  -> string (* message to sign *)
                  -> signatur
+val scrypt : string (* password *)
+             -> string (* salt *)
+             -> signatur
 
 val allowHttp : transaction unit

@@ -10,6 +10,8 @@ AX_CHECK_OPENSSL([echo >/dev/null], [echo "You must install OpenSSL development 
 
 LIBCURL_CHECK_CONFIG(yes, [], [echo >/dev/null], [echo "You must install libcurl development files."; exit 1])
 
+AC_CHECK_HEADER(libscrypt.h, [echo >/dev/null], [echo "You must install libscrypt development files."; exit 1])
+
 if test [$prefix = "NONE"]; then
     prefix=/usr/local
 fi
