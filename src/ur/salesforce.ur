@@ -350,6 +350,12 @@ fun values [chosen ::: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen]
                     (r ++ {Attributes = {Typ = ty}})
 }
 
+type field = {
+     Nam : sfield,
+     Typ : string,
+     Nillable : bool
+}
+
 functor Make(M : sig
                  val token : transaction (option string)
              end) = struct
@@ -415,6 +421,22 @@ functor Make(M : sig
     fun objects inst =
         s <- api (bless (prefix inst ^ "sobjects/"));
         return (List.mp (fn r => r.Nam) (fromJson s : objects).Sobjects)
+
+    type field = {
+         Nam : string,
+         Typ : string,
+         Nillable : bool
+    }
+    val _ : json field = json_record {Nam = "name", Typ = "type", Nillable = "nillable"}
+
+    type object1 = {
+         Fields : list field
+    }
+    val _ : json object1 = json_record {Fields = "fields"}
+
+    fun object inst sobj =
+        s <- api (bless (prefix inst ^ "sobjects/" ^ Urls.urlencode sobj ^ "/describe/"));
+        return (fromJson s : object1).Fields
 
     functor Table(N : sig
                       val stable : stable

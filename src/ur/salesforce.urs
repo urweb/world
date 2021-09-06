@@ -74,6 +74,12 @@ con values :: {Type} -> Type
 val values : chosen ::: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
              => folder chosen -> $chosen -> values (chosen ++ unchosen)
 
+type field = {
+     Nam : sfield,
+     Typ : string,
+     Nillable : bool
+}
+
 functor Make(M : sig
                  val token : transaction (option string)
              end) : sig
@@ -81,6 +87,7 @@ functor Make(M : sig
     (* The canonical page to examine a record *)
 
     val objects : instance -> transaction (list stable)
+    val object : instance -> stable -> transaction (list field)
 
     functor Table(N : sig
                       val stable : stable
