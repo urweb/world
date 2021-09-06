@@ -2,11 +2,6 @@ open Json
 open Urls
 
 signature S = sig
-    val authorize_url : url
-    val access_token_url : url
-
-    val client_id : string
-    val client_secret : string
     val scope : option string
     val hosted_domain : option string
 
@@ -34,7 +29,18 @@ val _ : json token_response = json_record_withOptional {Token = "access_token"}
 type error_response = {Error : string}
 val _ : json error_response = json_record {Error = "error_description"}
 
-functor Make(M : S) = struct
+type settings = {
+     AuthorizeUrl : url,
+     AccessTokenUrl : url,
+     ClientId : string,
+     ClientSecret : string
+}
+
+functor MakeDyn(M : sig
+                    include S
+
+                    val settings : transaction settings
+                end) = struct
     open M
 
     val authorize =
@@ -118,6 +124,7 @@ functor Make(M : S) = struct
 
                         val (code, state) = parse1 (show qs) None None
                     in
+                        settings <- settings;
                         goodState <- oneRowE1 (SELECT COUNT( * ) > 0
                                                FROM states
                                                WHERE states.State = {[state]});
@@ -126,9 +133,9 @@ functor Make(M : S) = struct
                         else
                             dml (DELETE FROM states
                                  WHERE State = {[state]});
-                            pb <- WorldFfi.post access_token_url None None
-                                                ("client_id=" ^ urlencode client_id
-                                                 ^ "&client_secret=" ^ urlencode client_secret
+                            pb <- WorldFfi.post settings.AccessTokenUrl None None
+                                                ("client_id=" ^ urlencode settings.ClientId
+                                                 ^ "&client_secret=" ^ urlencode settings.ClientSecret
                                                  ^ "&code=" ^ urlencode code
                                                  ^ "&grant_type=authorization_code"
                                                  ^ "&redirect_uri=" ^ urlencode (show (effectfulUrl authorized)));
@@ -143,9 +150,10 @@ functor Make(M : S) = struct
             state <- rand;
             tm <- now;
             dml (INSERT INTO states(State, Expires) VALUES({[state]}, {[addSeconds tm 300]}));
+            settings <- settings;
 
-            redirect (bless (show authorize_url
-                             ^ "?client_id=" ^ urlencode client_id
+            redirect (bless (show settings.AuthorizeUrl
+                             ^ "?client_id=" ^ urlencode settings.ClientId
                              ^ "&redirect_uri=" ^ urlencode (show (effectfulUrl authorized))
                              ^ "&state=" ^ show state
                              ^ "&response_type=code"
@@ -158,3 +166,20 @@ functor Make(M : S) = struct
                                   | Some hd => "&hd=" ^ urlencode hd)))
         end
 end
+
+functor Make(M : sig
+                 include S
+
+                 val authorize_url : url
+                 val access_token_url : url
+
+                 val client_id : string
+                 val client_secret : string
+             end) = MakeDyn(struct
+                                open M
+
+                                val settings = return {AuthorizeUrl = authorize_url,
+                                                       AccessTokenUrl = access_token_url,
+                                                       ClientId = client_id,
+                                                       ClientSecret = client_secret}
+                            end)

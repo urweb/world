@@ -20,6 +20,102 @@ type sfield = string
 val read_sfield = sread "Salesforce SObject field"
 val show_sfield = _
 
+type settings = {
+     ClientId : string,
+     ClientSecret : string,
+     Sandbox : bool
+}
+
+functor ThreeLeggedDyn(M : sig
+                           val https : bool
+
+                           val settings : transaction settings
+
+                           val onCompletion : transaction page
+                    end) = struct
+    open M
+
+    table secrets : { Secret : int,
+                      Token : string,
+                      Expires : time }
+      PRIMARY KEY Secret
+
+    task periodic 60 = fn () =>
+                          tm <- now;
+                          dml (DELETE FROM secrets
+                               WHERE Expires < {[addSeconds tm (-60)]})
+
+    cookie user : int
+
+    fun withToken {Token = tok, Expiration = seconds, ...} =
+        seconds <- return (Option.get (30 * 60) seconds);
+        secret <- rand;
+        tm <- now;
+        dml (INSERT INTO secrets(Secret, Token, Expires)
+             VALUES ({[secret]}, {[tok]}, {[addSeconds tm (seconds * 3 / 4)]}));
+        setCookie user {Value = secret,
+                        Expires = None,
+                        Secure = https}
+
+    open Oauth.MakeDyn(struct
+                           open M
+
+                           val settings =
+                               settings <- settings;
+                               url_base <- return ("https://" ^ (if settings.Sandbox then "test." else "login.") ^ "salesforce.com/services/oauth2/");
+                               return {ClientId = settings.ClientId,
+                                       ClientSecret = settings.ClientSecret,
+                                       AuthorizeUrl = bless (url_base ^ "authorize"),
+                                       AccessTokenUrl = bless (url_base ^ "token")}
+
+                           val scope = None
+                           val hosted_domain = None
+
+                           val withToken = withToken
+                           val nameForScopeParameter = None
+                           val parseTokenResponse = None
+                       end)
+
+    val token =
+        c <- getCookie user;
+        case c of
+            None => return None
+          | Some n =>
+            oneOrNoRowsE1 (SELECT (secrets.Token)
+                           FROM secrets
+                           WHERE secrets.Secret = {[n]}
+                             AND secrets.Expires > CURRENT_TIMESTAMP)
+
+    val loggedIn = c <- getCookie user;
+        case c of
+            None => return False
+          | Some s =>
+            expiresO <- oneOrNoRowsE1 (SELECT (secrets.Expires)
+                                       FROM secrets
+                                       WHERE secrets.Secret = {[s]});
+            case expiresO of
+                None => return False
+              | Some exp =>
+                tm <- now;
+                return (tm < exp)
+    val logout = clearCookie user
+
+    val status =
+        li <- loggedIn;
+        li <- source li;
+        cur <- currentUrl;
+        return <xml>
+          <dyn signal={liV <- signal li;
+                       if liV then
+                           return <xml><button value="Log out of Salesforce"
+                                               onclick={fn _ => rpc logout; set li False}/></xml>
+                       else
+                           return <xml><button value="Log into Salesforce"
+                                               onclick={fn _ => redirect (url authorize)}/></xml>}/>
+        </xml>
+end
+
+
 functor ThreeLegged(M : sig
                         val https : bool
                         val sandbox : bool
@@ -305,6 +401,20 @@ functor Make(M : sig
     fun prefix inst = "https://" ^ inst ^ ".salesforce.com/services/data/v47.0/"
     fun prefixLiteral inst suffix = "https://" ^ inst ^ ".salesforce.com" ^ suffix
     fun record inst id = bless ("https://" ^ inst ^ ".lightning.force.com/lightning/r/" ^ urlencode id ^ "/view")
+
+    type object = {
+         Nam : string
+    }
+    val _ : json object = json_record {Nam = "name"}
+
+    type objects = {
+         Sobjects : list object
+    }
+    val _ : json objects = json_record {Sobjects = "sobjects"}
+
+    fun objects inst =
+        s <- api (bless (prefix inst ^ "sobjects/"));
+        return (List.mp (fn r => r.Nam) (fromJson s : objects).Sobjects)
 
     functor Table(N : sig
                       val stable : stable

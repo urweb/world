@@ -16,6 +16,25 @@ functor ThreeLegged(M : sig
     val logout : transaction unit
 end
 
+type settings = {
+     ClientId : string,
+     ClientSecret : string,
+     Sandbox : bool
+}
+
+(* Allow some details to be determined at runtime. *)
+functor ThreeLeggedDyn(M : sig
+                           val settings : transaction settings
+
+                           val https : bool
+
+                           val onCompletion : transaction page
+                       end) : sig
+    val token : transaction (option string)
+    val status : transaction xbody
+    val logout : transaction unit
+end
+
 type stable (* a kind of SObject, e.g. Account, Contact *)
 val read_stable : read stable
 val show_stable : show stable
@@ -60,6 +79,8 @@ functor Make(M : sig
              end) : sig
     val record : instance -> string (* object ID *) -> url
     (* The canonical page to examine a record *)
+
+    val objects : instance -> transaction (list stable)
 
     functor Table(N : sig
                       val stable : stable
