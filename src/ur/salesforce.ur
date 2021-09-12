@@ -353,7 +353,8 @@ fun values [chosen ::: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen]
 type field = {
      Nam : sfield,
      Typ : string,
-     Nillable : bool
+     Nillable : bool,
+     ReferenceTo : option (list string)
 }
 
 functor Make(M : sig
@@ -422,12 +423,9 @@ functor Make(M : sig
         s <- api (bless (prefix inst ^ "sobjects/"));
         return (List.mp (fn r => r.Nam) (fromJson s : objects).Sobjects)
 
-    type field = {
-         Nam : string,
-         Typ : string,
-         Nillable : bool
-    }
-    val _ : json field = json_record {Nam = "name", Typ = "type", Nillable = "nillable"}
+    val _ : json field = json_record_withOptional
+                             {Nam = "name", Typ = "type", Nillable = "nillable"}
+                             {ReferenceTo = "referenceTo"}
 
     type object1 = {
          Fields : list field

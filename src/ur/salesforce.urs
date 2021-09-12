@@ -77,7 +77,8 @@ val values : chosen ::: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
 type field = {
      Nam : sfield,
      Typ : string,
-     Nillable : bool
+     Nillable : bool,
+     ReferenceTo : option (list string)
 }
 
 functor Make(M : sig
