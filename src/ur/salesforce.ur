@@ -354,7 +354,9 @@ type field = {
      Nam : sfield,
      Typ : string,
      Nillable : bool,
-     ReferenceTo : option (list string)
+     ReferenceTo : option (list string),
+     NameField : bool,
+     Createable : bool
 }
 
 functor Make(M : sig
@@ -424,7 +426,8 @@ functor Make(M : sig
         return (List.mp (fn r => r.Nam) (fromJson s : objects).Sobjects)
 
     val _ : json field = json_record_withOptional
-                             {Nam = "name", Typ = "type", Nillable = "nillable"}
+                             {Nam = "name", Typ = "type", Nillable = "nillable",
+                              NameField = "nameField", Createable = "createable"}
                              {ReferenceTo = "referenceTo"}
 
     type object1 = {

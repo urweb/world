@@ -78,7 +78,9 @@ type field = {
      Nam : sfield,
      Typ : string,
      Nillable : bool,
-     ReferenceTo : option (list string)
+     ReferenceTo : option (list string),
+     NameField : bool,
+     Createable : bool
 }
 
 functor Make(M : sig
