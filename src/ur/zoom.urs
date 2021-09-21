@@ -55,7 +55,7 @@ datatype monthly_week =
 type recurrence = {
      Typ : recurrence_type,
      RepeatInterval : int,
-     WeeklyDays : option (list Datetime.day_of_week),
+     WeeklyDays : option string,
      MonthlyDay : option int,
      MonthlyWeek : option monthly_week,
      MonthlyWeekDay : option Datetime.day_of_week,
