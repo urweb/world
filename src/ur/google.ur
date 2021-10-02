@@ -1,13 +1,14 @@
 open Json
 
 structure Scope = struct
-    type t = Scopes.t [Calendar, CalendarRO, CalendarAdmin, GmailRO]
+    type t = Scopes.t [Calendar, CalendarRO, CalendarAdmin, DriveRO, GmailRO]
     val empty = Scopes.empty
     val union = Scopes.union
     fun toString v =
         case Scopes.toString {Calendar = "https://www.googleapis.com/auth/calendar",
                               CalendarRO = "https://www.googleapis.com/auth/calendar.readonly",
                               CalendarAdmin = "https://www.googleapis.com/auth/admin.directory.resource.calendar",
+                              DriveRO = "https://www.googleapis.com/auth/drive.readonly",
                               GmailRO = "https://www.googleapis.com/auth/gmail.readonly"} v of
             "" => "email profile"
           | s => "email profile " ^ s
@@ -15,6 +16,7 @@ structure Scope = struct
     val calendar = Scopes.one [#Calendar]
     val calendar_readonly = Scopes.one [#CalendarRO]
     val calendar_admin = Scopes.one [#CalendarAdmin]
+    val drive_readonly = Scopes.one [#DriveRO]
     val gmail_readonly = Scopes.one [#GmailRO]
 
     val readonly = Scopes.disjoint calendar
@@ -452,6 +454,18 @@ val _ = mkShow (fn m =>
                      | ExternalOnly => "externalOnly"
                      | NoneUpdates => "none")
 
+type file = {
+     Id : string,
+     Nam : string,
+     MimeType : option string,
+     Description : option string
+}
+val _ : json file = json_record_withOptional
+                    {Id = "id",
+                     Nam = "name"}
+                    {MimeType = "mimeType",
+                     Description = "description"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -523,6 +537,30 @@ functor Make(M : AUTH) = struct
         tok <- token;
         WorldFfi.get (api_url svc url) (Some ("Bearer " ^ tok)) False
 
+    fun apiPaged svc [t] (_ : json t) items url : transaction (list t) =
+        let
+            val j : json {Items : list t, NextPageToken : option string} =
+                    json_record_withOptional {Items = items} {NextPageToken = "nextPageToken"}
+
+            fun getPages nextPageToken acc =
+                s <- api svc (case nextPageToken of
+                                  None => url
+                                | Some nextPageToken =>
+                                  if String.all (fn ch => ch <> #"?") url then
+                                      url ^ "?nextPageToken=" ^ Urls.urlencode nextPageToken
+                                  else
+                                      url ^ "&nextPageToken=" ^ Urls.urlencode nextPageToken);
+                r <- return (@fromJson j s);
+                case r.NextPageToken of
+                    None =>
+                    (case acc of
+                         [] => return r.Items
+                       | _ => return (List.rev (List.revAppend r.Items acc)))
+                  | Some _ => getPages r.NextPageToken (List.revAppend r.Items acc)
+        in
+            getPages None []
+        end
+
     fun apiPost svc url body =
         tok <- token;
         WorldFfi.post (api_url svc url) (Some ("Bearer " ^ tok)) (Some "application/json") body
@@ -569,7 +607,7 @@ functor Make(M : AUTH) = struct
         val apiPost = apiPost svc
         val apiPut = apiPut svc
         val apiDelete = apiDelete svc
-        
+
         structure Calendars = struct
             val list =
                 s <- api "users/me/calendarList";
@@ -677,6 +715,20 @@ functor Make(M : AUTH) = struct
                     error <xml>Google Calendar: attempt to <tt>Events.delete</tt> in read-only mode</xml>
                 else
                     Monad.ignore (apiDelete ("calendar/v3/calendars/" ^ cid ^ "/events/" ^ eid))
+        end
+    end
+
+    structure Drive = struct
+        val svc = "drive/v3"
+        val apiPaged = apiPaged svc
+
+        structure Files = struct
+            fun list r =
+                url <- return "files";
+                url <- return (case r.Query of
+                                   None => url
+                                 | Some q => url ^ "?q=" ^ Urls.urlencode q);
+                apiPaged "files" url
         end
     end
 end

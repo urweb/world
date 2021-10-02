@@ -8,6 +8,7 @@ structure Scope : sig
     val calendar : t
     val calendar_readonly : t
     val calendar_admin : t
+    val drive_readonly : t
     val gmail_readonly : t
 
     (* SUPER-COUNTERINTUITIVE FACT TO REMEMBER: to make domain-wide delegation
@@ -104,7 +105,7 @@ type calendar_id
 val show_calendar_id : show calendar_id
 val read_calendar_id : read calendar_id
 val eq_calendar_id : eq calendar_id
-                       
+
 type calendar = {
      Id : calendar_id,
      Summary : string,
@@ -160,6 +161,14 @@ datatype updatesMode =
        | ExternalOnly
        | NoneUpdates
 
+(** * Drive types *)
+
+type file = {
+     Id : string,
+     Nam : string,
+     MimeType : option string,
+     Description : option string
+}
 
 (** * The main API interface *)
 
@@ -185,6 +194,12 @@ functor Make(M : AUTH) : sig
             val insert : calendar_id -> {SendUpdates : option updatesMode} -> newEvent -> transaction event
             val update : calendar_id -> event -> transaction event
             val delete : calendar_id -> event_id -> transaction unit
+        end
+    end
+
+    structure Drive : sig
+        structure Files : sig
+            val list : {Query : option string} -> transaction (list file)
         end
     end
 end
