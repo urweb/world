@@ -191,6 +191,14 @@ type spreadsheet = {
 datatype spreadsheet_request =
          AddSheet of sheet
 
+datatype value_input_option =
+         Raw
+       | UserEntered
+
+datatype major_dimension =
+         Rows
+       | Columns
+
 (** * The main API interface *)
 
 functor Make(M : AUTH) : sig
@@ -225,9 +233,19 @@ functor Make(M : AUTH) : sig
     end
 
     structure Sheets : sig
+        val intToColumn : int -> string
+        val columnToInt : string -> int
+
         structure Spreadsheets : sig
             val get : string (* ID *) -> transaction spreadsheet
             val update : string (* ID *) -> list spreadsheet_request -> transaction unit
+            val write : {SpreadsheetId : string,
+                         SheetName : string,
+                         FirstCell : string,
+                         LastCell : string,
+                         ValueInputOption : value_input_option,
+                         MajorDimension : major_dimension,
+                         Values : list (list string)} -> transaction unit
         end
     end
 end

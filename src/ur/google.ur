@@ -510,6 +510,31 @@ type spreadsheet_requests = {
 }
 val _ : json spreadsheet_requests = json_record {Requests = "requests"}
 
+datatype value_input_option =
+         Raw
+       | UserEntered
+val _ = mkShow (fn x =>
+                   case x of
+                       Raw => "RAW"
+                     | UserEntered => "USER_ENTERED")
+
+datatype major_dimension =
+         Rows
+       | Columns
+val _ = mkShow (fn x =>
+                   case x of
+                       Rows => "ROWS"
+                     | Columns => "COLUMNS")
+
+type write_request = {
+     Range : string,
+     MajorDimension : string,
+     Values : list (list string)
+}
+val _ : json write_request = json_record {Range = "range",
+                                          MajorDimension = "majorDimension",
+                                          Values = "values"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -794,10 +819,32 @@ functor Make(M : AUTH) = struct
     end
 
     structure Sheets = struct
+        fun intToColumn n =
+            if n < 0 then
+                error <xml>Negative column number for Google Sheets</xml>
+            else if n >= 26 then
+                error <xml>Column number for Google Sheets is higher than default available number.</xml>
+            else
+                String.str (Char.fromInt (Char.toInt #"A" + n))
+
+        fun columnToInt s =
+            if String.length s <> 1 then
+                error <xml>Wrong length for Google Sheets column name</xml>
+            else
+                let
+                    val ch = String.sub s 0
+                in
+                    if Char.isUpper ch then
+                        Char.toInt ch - Char.toInt #"A"
+                    else
+                        error <xml>Invalid character for Google Sheets column name</xml>
+                end
+
         structure Spreadsheets = struct
             val svc = "sheets/v4"
             val api = api svc
             val apiPost = apiPost svc
+            val apiPut = apiPut svc
 
             fun get id =
                 s <- api ("spreadsheets/" ^ Urls.urlencode id);
@@ -805,6 +852,13 @@ functor Make(M : AUTH) = struct
 
             fun update id reqs =
                 Monad.ignore (apiPost ("spreadsheets/" ^ Urls.urlencode id ^ ":batchUpdate") (toJson {Requests = reqs}))
+
+            fun write r =
+                range <- return (r.SheetName ^ "!" ^ r.FirstCell ^ ":" ^ r.LastCell);
+                Monad.ignore (apiPut ("spreadsheets/" ^ Urls.urlencode r.SpreadsheetId ^ "/values/" ^ Urls.urlencode range ^ "?valueInputOption=" ^ show r.ValueInputOption)
+                                     (toJson {Range = range,
+                                              MajorDimension = show r.MajorDimension,
+                                              Values = r.Values}))
         end
     end
 end
