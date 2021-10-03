@@ -1,7 +1,7 @@
 open Json
 
 structure Scope = struct
-    type t = Scopes.t [Calendar, CalendarRO, CalendarAdmin, DriveRO, GmailRO]
+    type t = Scopes.t [Calendar, CalendarRO, CalendarAdmin, DriveRO, GmailRO, Spreadsheets, SpreadsheetsRO]
     val empty = Scopes.empty
     val union = Scopes.union
     fun toString v =
@@ -9,7 +9,9 @@ structure Scope = struct
                               CalendarRO = "https://www.googleapis.com/auth/calendar.readonly",
                               CalendarAdmin = "https://www.googleapis.com/auth/admin.directory.resource.calendar",
                               DriveRO = "https://www.googleapis.com/auth/drive.readonly",
-                              GmailRO = "https://www.googleapis.com/auth/gmail.readonly"} v of
+                              GmailRO = "https://www.googleapis.com/auth/gmail.readonly",
+                              Spreadsheets = "https://www.googleapis.com/auth/spreadsheets",
+                              SpreadsheetsRO = "https://www.googleapis.com/auth/spreadsheets.readonly"} v of
             "" => "email profile"
           | s => "email profile " ^ s
 
@@ -18,8 +20,10 @@ structure Scope = struct
     val calendar_admin = Scopes.one [#CalendarAdmin]
     val drive_readonly = Scopes.one [#DriveRO]
     val gmail_readonly = Scopes.one [#GmailRO]
+    val spreadsheets = Scopes.one [#Spreadsheets]
+    val spreadsheets_readonly = Scopes.one [#SpreadsheetsRO]
 
-    val readonly = Scopes.disjoint calendar
+    val readonly = Scopes.disjoint (union (union calendar calendar_admin) spreadsheets)
 end
 
 signature AUTH = sig
@@ -466,10 +470,53 @@ val _ : json file = json_record_withOptional
                     {MimeType = "mimeType",
                      Description = "description"}
 
+type sheet_properties = {
+     SheetId : option int,
+     Title : string
+}
+val _ : json sheet_properties = json_record_withOptional {Title = "title"}
+                                                         {SheetId = "sheetId"}
+
+type sheet = {
+     Properties : option sheet_properties
+}
+val _ : json sheet = json_record_withOptional {}
+                     {Properties = "properties"}
+
+type spreadsheet = {
+     SpreadsheetId : option string,
+     Sheets : option (list sheet)
+}
+val _ : json spreadsheet = json_record_withOptional {}
+                           {SpreadsheetId = "spreadsheetId",
+                            Sheets = "sheets"}
+
+datatype spreadsheet_request =
+         AddSheet of sheet
+type spreadsheet_request' = variant [AddSheet = sheet]
+val _ : json spreadsheet_request' = json_variant {AddSheet = "addSheet"}
+
+fun spreadsheet_request_in (x : spreadsheet_request') : spreadsheet_request =
+    match x {AddSheet = AddSheet}
+
+fun spreadsheet_request_out (x : spreadsheet_request) : spreadsheet_request' =
+    case x of
+        AddSheet y => make [#AddSheet] y
+
+val json_spreadsheet_request = json_derived spreadsheet_request_in spreadsheet_request_out
+
+type spreadsheet_requests = {
+     Requests : list spreadsheet_request
+}
+val _ : json spreadsheet_requests = json_record {Requests = "requests"}
+
 functor Make(M : AUTH) = struct
     open M
 
-    fun api_url svc url = bless ("https://www.googleapis.com/" ^ svc ^ "/" ^ url)
+    fun api_url svc url =
+        case svc of
+            "sheets/v4" => bless ("https://sheets.googleapis.com/v4/" ^ url)
+          | _ => bless ("https://www.googleapis.com/" ^ svc ^ "/" ^ url)
 
     val token =
         toko <- M.token;
@@ -535,7 +582,10 @@ functor Make(M : AUTH) = struct
 
     fun api svc url =
         tok <- token;
-        WorldFfi.get (api_url svc url) (Some ("Bearer " ^ tok)) False
+        debug ("Google GET: " ^ show (api_url svc url));
+        s <- WorldFfi.get (api_url svc url) (Some ("Bearer " ^ tok)) False;
+        debug ("Google response: " ^ s);
+        return s
 
     fun apiPaged svc [t] (_ : json t) items url : transaction (list t) =
         let
@@ -563,15 +613,26 @@ functor Make(M : AUTH) = struct
 
     fun apiPost svc url body =
         tok <- token;
-        WorldFfi.post (api_url svc url) (Some ("Bearer " ^ tok)) (Some "application/json") body
+        debug ("Google POST: " ^ show (api_url svc url));
+        debug ("Google request: " ^ body);
+        s <- WorldFfi.post (api_url svc url) (Some ("Bearer " ^ tok)) (Some "application/json") body;
+        debug ("Google response: " ^ s);
+        return s
 
     fun apiPut svc url body =
         tok <- token;
-        WorldFfi.put (api_url svc url) (Some ("Bearer " ^ tok)) (Some "application/json") body
+        debug ("Google PUT: " ^ show (api_url svc url));
+        debug ("Google request: " ^ body);
+        s <- WorldFfi.put (api_url svc url) (Some ("Bearer " ^ tok)) (Some "application/json") body;
+        debug ("Google response: " ^ s);
+        return s
 
     fun apiDelete svc url =
         tok <- token;
-        WorldFfi.delete (api_url svc url) (Some ("Bearer " ^ tok))
+        debug ("Google DELETE: " ^ show (api_url svc url));
+        s <- WorldFfi.delete (api_url svc url) (Some ("Bearer " ^ tok));
+        debug ("Google response: " ^ s);
+        return s
 
     structure Gmail = struct
         val svc = "gmail/v1"
@@ -729,6 +790,21 @@ functor Make(M : AUTH) = struct
                                    None => url
                                  | Some q => url ^ "?q=" ^ Urls.urlencode q);
                 apiPaged "files" url
+        end
+    end
+
+    structure Sheets = struct
+        structure Spreadsheets = struct
+            val svc = "sheets/v4"
+            val api = api svc
+            val apiPost = apiPost svc
+
+            fun get id =
+                s <- api ("spreadsheets/" ^ Urls.urlencode id);
+                return (fromJson s)
+
+            fun update id reqs =
+                Monad.ignore (apiPost ("spreadsheets/" ^ Urls.urlencode id ^ ":batchUpdate") (toJson {Requests = reqs}))
         end
     end
 end

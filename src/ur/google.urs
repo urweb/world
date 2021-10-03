@@ -10,6 +10,8 @@ structure Scope : sig
     val calendar_admin : t
     val drive_readonly : t
     val gmail_readonly : t
+    val spreadsheets : t
+    val spreadsheets_readonly : t
 
     (* SUPER-COUNTERINTUITIVE FACT TO REMEMBER: to make domain-wide delegation
      * work properly (as is needed for two-legged authentication with
@@ -170,6 +172,25 @@ type file = {
      Description : option string
 }
 
+(** * Sheets types *)
+
+type sheet_properties = {
+     SheetId : option int,
+     Title : string
+}
+
+type sheet = {
+     Properties : option sheet_properties
+}
+
+type spreadsheet = {
+     SpreadsheetId : option string,
+     Sheets : option (list sheet)
+}
+
+datatype spreadsheet_request =
+         AddSheet of sheet
+
 (** * The main API interface *)
 
 functor Make(M : AUTH) : sig
@@ -200,6 +221,13 @@ functor Make(M : AUTH) : sig
     structure Drive : sig
         structure Files : sig
             val list : {Query : option string} -> transaction (list file)
+        end
+    end
+
+    structure Sheets : sig
+        structure Spreadsheets : sig
+            val get : string (* ID *) -> transaction spreadsheet
+            val update : string (* ID *) -> list spreadsheet_request -> transaction unit
         end
     end
 end

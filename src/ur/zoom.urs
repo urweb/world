@@ -293,6 +293,7 @@ type participant = {
      Id : option string,
      UserId : option string,
      UserName : option string,
+     Email : option string,
      Device : option string,
      IpAddress : option string,
      Location : option string,
