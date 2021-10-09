@@ -8,6 +8,7 @@ structure Scope : sig
     val meetingWrite : t
     val webinarRead : t
     val webinarWrite : t
+    val dashboardMeetingsRead : t
 end
 
 signature AUTH = sig
@@ -347,3 +348,45 @@ functor Make(M : AUTH) : sig
         val get : int (* meeting ID *) -> transaction (option recording)
     end
 end
+
+(* Webhooks *)
+
+type webhook_participant = {
+     UserId : string,
+     UserName : string,
+     Id : option string,
+     JoinTime : time,
+     Email : option string,
+     RegistrantId : option string,
+     ParticipantUserId : option string
+}
+
+type webhook_joined' = {
+     Id : int,
+     Uuid : string,
+     HostId : string,
+     Topic : option string,
+     Typ : meeting_type,
+     StartTime : time,
+     Timezone : option string,
+     Duration : int,
+     Participant : webhook_participant
+}
+
+type webhook_joined = {
+     AccountId : string,
+     Object : webhook_joined'
+}
+
+datatype webhook_event' =
+         MeetingParticipantJoined of webhook_joined
+
+type webhook_event = {
+     EventTs : int,
+     Payload : webhook_event'
+}
+
+val webhook : string (* verification token to check for *)
+              -> postBody
+              -> transaction (option webhook_event)
+(* Could return None for an event type not wrapped here yet. *)

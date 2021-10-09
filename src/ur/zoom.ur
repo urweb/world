@@ -1,18 +1,20 @@
 open Json
 
 structure Scope = struct
-    type t = Scopes.t [MeetingRead, MeetingWrite, WebinarRead, WebinarWrite]
+    type t = Scopes.t [MeetingRead, MeetingWrite, WebinarRead, WebinarWrite, DashboardMeetingsRead]
     val empty = Scopes.empty
     val union = Scopes.union
     val toString = Scopes.toString {MeetingRead = "meeting:read",
                                     MeetingWrite = "meeting:write",
                                     WebinarRead = "webinar:read",
-                                    WebinarWrite = "webinar:write"}
+                                    WebinarWrite = "webinar:write",
+                                    DashboardMeetingsRead = "dashboard_meetings:read:admin"}
 
     val meetingRead = Scopes.one [#MeetingRead]
     val meetingWrite = Scopes.one [#MeetingWrite]
     val webinarRead = Scopes.one [#WebinarRead]
     val webinarWrite = Scopes.one [#WebinarWrite]
+    val dashboardMeetingsRead = Scopes.one [#DashboardMeetingsRead]
 
     val readonly = Scopes.disjoint (union meetingWrite webinarWrite)
 end
@@ -967,3 +969,93 @@ functor ThreeLegged(M : sig
                                                onclick={fn _ => redirect (url authorize)}/></xml>}/>
         </xml>
 end
+
+(* Webhooks *)
+
+type webhook_participant = {
+     UserId : string,
+     UserName : string,
+     Id : option string,
+     JoinTime : time,
+     Email : option string,
+     RegistrantId : option string,
+     ParticipantUserId : option string
+}
+val _ : json webhook_participant = json_record_withOptional
+                                   {UserId = "user_id",
+                                    UserName = "user_name",
+                                    JoinTime = "join_time"}
+                                   {Id = "id",
+                                    Email = "email",
+                                    RegistrantId = "registrant_id",
+                                    ParticipantUserId = "participant_user_id"}
+
+type webhook_joined' = {
+     Id : int,
+     Uuid : string,
+     HostId : string,
+     Topic : option string,
+     Typ : meeting_type,
+     StartTime : time,
+     Timezone : option string,
+     Duration : int,
+     Participant : webhook_participant
+}
+val _ : json webhook_joined' = json_record_withOptional
+                               {Id = "id",
+                                Uuid = "uuid",
+                                HostId = "host_id",
+                                Typ = "type",
+                                StartTime = "start_time",
+                                Duration = "duration",
+                                Participant = "participant"}
+                               {Topic = "topic",
+                                Timezone = "timezone"}
+
+type webhook_joined = {
+     AccountId : string,
+     Object : webhook_joined'
+}
+val _ : json webhook_joined = json_record {AccountId = "account_id",
+                                           Object = "object"}
+
+datatype webhook_event' =
+         MeetingParticipantJoined of webhook_joined
+
+type webhook_event = {
+     EventTs : int,
+     Payload : webhook_event'
+}
+
+type webhook_event_union_1 = {
+     Event : string,
+     EventTs : int
+}
+val _ : json webhook_event_union_1 = json_record {Event = "event", EventTs = "event_ts"}
+
+type webhook_event_union_2 a = {
+     Payload : a
+}
+fun json_union_2 [a] (_ : json a) : json (webhook_event_union_2 a) =
+    json_record {Payload = "payload"}
+
+fun webhook token pbody =
+    token' <- getHeader (blessRequestHeader "Authorization");
+    case token' of
+        None => error <xml>Missing Authorization header in Zoom webhook event</xml>
+      | Some token' =>
+        if token' <> token then
+            error <xml>Wrong verification token in Zoom webhook event</xml>
+        else
+            if postType pbody <> "application/json" && postType pbody <> "application/json; charset=utf-8" then
+                error <xml>Unexpected Zoom webhook event MIME type: {[postType pbody]}</xml>
+            else
+                ev1 <- return (fromJson (postData pbody) : webhook_event_union_1);
+                ev <- (case ev1.Event of
+                           "meeting.participant_joined" =>
+                           return (Some (MeetingParticipantJoined (fromJson (postData pbody) : webhook_event_union_2 _).Payload))
+                         | _ => return None);
+                case ev of
+                    None => return None
+                  | Some ev => return (Some {EventTs = ev1.EventTs, Payload = ev})
+

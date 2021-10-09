@@ -2,6 +2,7 @@ library config
 ffi worldFfi
 link -lurweb_world -lscrypt
 effectful WorldFfi.post
+allow requestHeader Authorization
 
 $/char
 $/string
