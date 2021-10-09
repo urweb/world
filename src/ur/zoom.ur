@@ -972,7 +972,7 @@ end
 
 (* Webhooks *)
 
-type webhook_participant = {
+type webhook_participant_joined = {
      UserId : string,
      UserName : string,
      Id : option string,
@@ -981,14 +981,14 @@ type webhook_participant = {
      RegistrantId : option string,
      ParticipantUserId : option string
 }
-val _ : json webhook_participant = json_record_withOptional
-                                   {UserId = "user_id",
-                                    UserName = "user_name",
-                                    JoinTime = "join_time"}
-                                   {Id = "id",
-                                    Email = "email",
-                                    RegistrantId = "registrant_id",
-                                    ParticipantUserId = "participant_user_id"}
+val _ : json webhook_participant_joined = json_record_withOptional
+                                          {UserId = "user_id",
+                                           UserName = "user_name",
+                                           JoinTime = "join_time"}
+                                          {Id = "id",
+                                           Email = "email",
+                                           RegistrantId = "registrant_id",
+                                           ParticipantUserId = "participant_user_id"}
 
 type webhook_joined' = {
      Id : int,
@@ -999,7 +999,7 @@ type webhook_joined' = {
      StartTime : time,
      Timezone : option string,
      Duration : int,
-     Participant : webhook_participant
+     Participant : webhook_participant_joined
 }
 val _ : json webhook_joined' = json_record_withOptional
                                {Id = "id",
@@ -1019,8 +1019,58 @@ type webhook_joined = {
 val _ : json webhook_joined = json_record {AccountId = "account_id",
                                            Object = "object"}
 
+type webhook_participant_left = {
+     UserId : string,
+     UserName : string,
+     Id : option string,
+     LeaveTime : time,
+     LeaveReason : option string,
+     Email : option string,
+     RegistrantId : option string,
+     ParticipantUserId : option string
+}
+val _ : json webhook_participant_left = json_record_withOptional
+                                        {UserId = "user_id",
+                                         UserName = "user_name",
+                                         LeaveTime = "leave_time"}
+                                        {Id = "id",
+                                         LeaveReason = "leave_reason",
+                                         Email = "email",
+                                         RegistrantId = "registrant_id",
+                                         ParticipantUserId = "participant_user_id"}
+
+type webhook_left' = {
+     Id : int,
+     Uuid : string,
+     HostId : string,
+     Topic : option string,
+     Typ : meeting_type,
+     StartTime : time,
+     Timezone : option string,
+     Duration : int,
+     Participant : webhook_participant_left
+}
+val _ : json webhook_left' = json_record_withOptional
+                             {Id = "id",
+                              Uuid = "uuid",
+                              HostId = "host_id",
+                              Typ = "type",
+                              StartTime = "start_time",
+                              Duration = "duration",
+                              Participant = "participant"}
+                             {Topic = "topic",
+                              Timezone = "timezone"}
+
+type webhook_left = {
+     AccountId : string,
+     Object : webhook_left'
+}
+val _ : json webhook_left = json_record {AccountId = "account_id",
+                                         Object = "object"}
+
 datatype webhook_event' =
          MeetingParticipantJoined of webhook_joined
+       | MeetingParticipantLeft of webhook_left
 
 type webhook_event = {
      EventTs : int,
@@ -1054,6 +1104,8 @@ fun webhook token pbody =
                 ev <- (case ev1.Event of
                            "meeting.participant_joined" =>
                            return (Some (MeetingParticipantJoined (fromJson (postData pbody) : webhook_event_union_2 _).Payload))
+                         | "meeting.participant_left" =>
+                           return (Some (MeetingParticipantLeft (fromJson (postData pbody) : webhook_event_union_2 _).Payload))
                          | _ => return None);
                 case ev of
                     None => return None
