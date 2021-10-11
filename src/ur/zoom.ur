@@ -709,6 +709,51 @@ val _ : json participant = json_record_withOptional {}
                            InRoomParticipants = "in_room_participants",
                            LeaveReason = "leave_reason"}
 
+datatype concurrent_meeting = Basic | Plus | NoConcurrent
+val _ : json concurrent_meeting = json_derived
+                                      (fn x =>
+                                          case x of
+                                              "Basic" => Basic
+                                            | "Plus" => Plus
+                                            | "None" => NoConcurrent
+                                            | _ => error <xml>Bad Zoom concurrent-meeting setting {[x]}</xml>)
+                                     (fn x =>
+                                         case x of
+                                             Basic => "Basic"
+                                           | Plus => "Plus"
+                                           | NoConcurrent => "None")
+
+type feature = {
+     MeetingCapacity : option int,
+     LargeMeeting : option bool,
+     LargeMeetingCapacity : option int,
+     Webinar : option bool,
+     WebinarCapacity : option int,
+     ZoomEvents : option bool,
+     ZoomEventsCapacity : option int,
+     CnMeeting : option bool,
+     InMeeting : option bool,
+     ZoomPhone : option bool,
+     ConcurrentMeeting : option string
+}
+val _ : json feature = json_record_withOptional {}
+                       {MeetingCapacity = "meeting_capacity",
+                        LargeMeeting = "large_meeting",
+                        LargeMeetingCapacity = "large_meeting_capacity",
+                        Webinar = "webinar",
+                        WebinarCapacity = "webinar_capacity",
+                        ZoomEvents = "zoom_events",
+                        ZoomEventsCapacity = "zoom_events_capacity",
+                        CnMeeting = "cn_meeting",
+                        InMeeting = "in_meeting",
+                        ZoomPhone = "zoom_phone",
+                        ConcurrentMeeting = "concurrent_meeting"}
+
+type user_settings = {
+     Feature : feature
+}
+val _ : json user_settings = json_record {Feature = "feature"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -832,6 +877,12 @@ functor Make(M : AUTH) = struct
         fun get x =
             so <- apiOpt ("meetings/" ^ show x ^ "/recordings");
             return (Option.mp fromJson so)
+    end
+
+    structure Users = struct
+        val ownSettings =
+            s <- api "users/me/settings";
+            return (fromJson s)
     end
 end
 

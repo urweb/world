@@ -319,6 +319,28 @@ type participant = {
      LeaveReason : option string
 }
 
+(* User settings *)
+
+datatype concurrent_meeting = Basic | Plus | NoConcurrent
+
+type feature = {
+     MeetingCapacity : option int,
+     LargeMeeting : option bool,
+     LargeMeetingCapacity : option int,
+     Webinar : option bool,
+     WebinarCapacity : option int,
+     ZoomEvents : option bool,
+     ZoomEventsCapacity : option int,
+     CnMeeting : option bool,
+     InMeeting : option bool,
+     ZoomPhone : option bool,
+     ConcurrentMeeting : option string
+}
+
+type user_settings = {
+     Feature : feature
+}
+
 functor Make(M : AUTH) : sig
     structure Meetings : sig
         val list : transaction (list meeting)
@@ -346,6 +368,10 @@ functor Make(M : AUTH) : sig
     structure CloudRecordings : sig
         val list : transaction (list recording)
         val get : int (* meeting ID *) -> transaction (option recording)
+    end
+
+    structure Users : sig
+        val ownSettings : transaction user_settings
     end
 end
 
