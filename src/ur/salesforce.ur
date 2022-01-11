@@ -407,8 +407,12 @@ functor Make(M : sig
     fun addId [r ::: {Type}] [[Attributes, Id] ~ r] (r : $([Attributes = {Url : string}] ++ r))
         : $([Id = string] ++ r) = r -- #Attributes ++ {Id = idFromUrl r.Attributes.Url}
 
-    fun prefix inst = "https://" ^ inst ^ ".salesforce.com/services/data/v47.0/"
-    fun prefixLiteral inst suffix = "https://" ^ inst ^ ".salesforce.com" ^ suffix
+    fun hostname inst =
+        case String.seek inst #"." of
+            None => inst ^ ".salesforce.com"
+          | Some _ => inst
+    fun prefix inst = "https://" ^ hostname inst ^ "/services/data/v53.0/"
+    fun prefixLiteral inst suffix = "https://" ^ hostname inst ^ suffix
     fun record inst id = bless ("https://" ^ inst ^ ".lightning.force.com/lightning/r/" ^ urlencode id ^ "/view")
 
     type object = {

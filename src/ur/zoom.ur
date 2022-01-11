@@ -988,7 +988,8 @@ functor ThreeLegged(M : sig
                         val access_token_url = bless "https://api.zoom.us/oauth/token"
 
                         val withToken = withToken
-                        val scope = Some (Scope.toString scopes)
+                        val scope = None (* Some (Scope.toString scopes) *)
+                        (* Why no scopes? See https://devforum.zoom.us/t/invalid-scope-errors/52654 *)
                         val nameForScopeParameter = None
                         val parseTokenResponse = None
                         val hosted_domain = None
