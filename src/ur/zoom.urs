@@ -4,6 +4,7 @@ structure Scope : sig
     val union : t -> t -> t
     val readonly : t -> bool
 
+    val userProfile : t
     val meetingRead : t
     val meetingWrite : t
     val webinarRead : t

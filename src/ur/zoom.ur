@@ -1,15 +1,17 @@
 open Json
 
 structure Scope = struct
-    type t = Scopes.t [MeetingRead, MeetingWrite, WebinarRead, WebinarWrite, DashboardMeetingsRead]
+    type t = Scopes.t [UserProfile, MeetingRead, MeetingWrite, WebinarRead, WebinarWrite, DashboardMeetingsRead]
     val empty = Scopes.empty
     val union = Scopes.union
-    val toString = Scopes.toString {MeetingRead = "meeting:read",
+    val toString = Scopes.toString {UserProfile = "user_profile",
+                                    MeetingRead = "meeting:read",
                                     MeetingWrite = "meeting:write",
                                     WebinarRead = "webinar:read",
                                     WebinarWrite = "webinar:write",
                                     DashboardMeetingsRead = "dashboard_meetings:read:admin"}
 
+    val userProfile = Scopes.one [#UserProfile]
     val meetingRead = Scopes.one [#MeetingRead]
     val meetingWrite = Scopes.one [#MeetingWrite]
     val webinarRead = Scopes.one [#WebinarRead]
