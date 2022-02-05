@@ -41,6 +41,7 @@ datatype meeting_type =
        | Scheduled
        | RecurringUnfixed
        | RecurringFixed
+       | PMI
 
 datatype recurrence_type =
          Daily
@@ -353,6 +354,9 @@ functor Make(M : AUTH) : sig
             val list : int (* ID *) -> transaction (list registrant)
             val add : int (* meeting ID *) -> registrant -> transaction string (* registrant ID *)
         end
+
+        (* Related dashboard functionality *)
+        val listPast : transaction (list meeting) (* Goes up to 6 months in the past. *)
     end
 
     structure Webinars : sig

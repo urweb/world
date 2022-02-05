@@ -30,6 +30,7 @@ datatype meeting_type =
        | Scheduled
        | RecurringUnfixed
        | RecurringFixed
+       | PMI
 val _ : json meeting_type = json_derived
                                 (fn x =>
                                     case x of
@@ -37,13 +38,15 @@ val _ : json meeting_type = json_derived
                                       | 2 => Scheduled
                                       | 3 => RecurringUnfixed
                                       | 8 => RecurringFixed
+                                      | 4 => PMI
                                       | _ => error <xml>Bad Zoom meeting type {[x]}</xml>)
                                 (fn x =>
                                     case x of
                                         Instant => 1
                                       | Scheduled => 2
                                       | RecurringUnfixed => 3
-                                      | RecurringFixed => 8)
+                                      | RecurringFixed => 8
+                                      | PMI => 4)
 
 datatype recurrence_type =
          Daily
@@ -346,6 +349,29 @@ val _ : json meeting = json_record_withOptional
                             JoinUrl = "join_url",
                             Recurrence = "recurrence",
                             Settings = "settings"}
+
+type past_meeting = {
+     Uuid : option string,
+     Id : option int,
+     Topic : string,
+     StartTime : option time,
+     EndTime : option time,
+     Duration : option string
+}
+val _ : json past_meeting = json_record_withOptional
+                                {Topic = "topic"}
+                                {Uuid = "uuid",
+                                 Id = "id",
+                                 StartTime = "start_time",
+                                 EndTime = "end_time",
+                                 Duration = "duration"}
+
+fun pastMeetingIn (pm : past_meeting) : meeting =
+    {Topic = pm.Topic,
+     Typ = Scheduled,
+     Uuid = pm.Uuid,
+     Id = pm.Id,
+     StartTime = pm.StartTime} ++ Api.optionals {}
 
 datatype webinar_type =
          Webinar
@@ -774,14 +800,18 @@ functor Make(M : AUTH) = struct
 
     fun api url =
         tok <- token;
+        debug ("Zoom GET: " ^ prefix ^ url);
         logged (WorldFfi.get (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False)
 
     fun apiOpt url =
         tok <- token;
+        debug ("Zoom GET: " ^ prefix ^ url);
         logged (WorldFfi.getOpt (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False)
 
     fun apiPost url body =
         tok <- token;
+        debug ("Zoom POST: " ^ prefix ^ url);
+        debug ("Zoom body: " ^ body);
         logged (WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) (Some "application/json") body)
 
     fun apiPaged [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
@@ -849,6 +879,22 @@ functor Make(M : AUTH) = struct
                 s <- apiPost ("meetings/" ^ show mid ^ "/registrants") (toJson p);
                 return (fromJson s : registrant_response).RegistrantId
         end
+
+        val listPast =
+            now <- now;
+            let
+                fun daysEarlier days = timef "%Y-%m-%d" (addSeconds now (days * (-24) * 60 * 60))
+
+                fun grabChunk daysInPast acc =
+                    if daysInPast > 30 * 6 then
+                        return acc
+                    else
+                        ms <- apiPaged "meetings" ("metrics/meetings?type=past&from=" ^ daysEarlier daysInPast
+                                                   ^ "&to=" ^ daysEarlier (daysInPast - 30));
+                        grabChunk (daysInPast + 30) (List.append (List.mp pastMeetingIn ms) acc)
+            in
+                grabChunk 30 []
+            end
     end
 
     structure Webinars = struct
