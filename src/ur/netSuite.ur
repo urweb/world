@@ -284,14 +284,7 @@ functor Make(M : sig
             return (List.mp (fn r => r.Nam) (fromJson s : catalog).Items)
 
         fun schema tname =
-            s <- apiWithAccept "application/swagger+json" ("record/v1/metadata-catalog/" ^ tname);
-            oa <- return (fromJson s : OpenAPI.openapi_spec);
-            case oa.Components of
-                None => error <xml>NetSuite API response includes no components.</xml>
-              | Some {Schemas = None, ...} => error <xml>NetSuite API response includes no schemas.</xml>
-              | Some {Schemas = Some scs, ...} =>
-                case List.assoc tname scs of
-                    None => error <xml>NetSuite API response includes no schema for this table.</xml>
-                  | Some sc => return sc
+            s <- apiWithAccept "application/schema+json" ("record/v1/metadata-catalog/" ^ tname);
+            return (fromJson s)
     end
 end

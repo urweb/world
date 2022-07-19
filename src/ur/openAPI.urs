@@ -18,6 +18,7 @@ type schema self = {
 
 structure Schema : sig
     datatype r = Rec of schema r
+    val json_r : Json.json r
 end
 
 type parameter = {
