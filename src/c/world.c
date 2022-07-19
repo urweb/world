@@ -60,6 +60,20 @@ uw_Basis_unit uw_WorldFfi_allowHttp(uw_context ctx) {
   return uw_unit_v;
 }
 
+typedef struct uw_WorldFfi_headers {
+  uw_Basis_string header, value;
+  struct uw_WorldFfi_headers *next;
+} *uw_WorldFfiHeaders;
+
+const uw_WorldFfi_headers emptyHeaders = NULL;
+uw_WorldFfi_headers uw_WorldFfi_addHeader(uw_context ctx, uw_WorldFfi_headers hs, uw_Basis_string header, uw_Basis_string value) {
+  uw_WorldFfiHeaders r = uw_malloc(ctx, sizeof(struct uw_WorldFfi_headers));
+  r->header = header;
+  r->value = value;
+  r->next = hs;
+  return r;
+}
+
 // Returns 1 on "not found".
 static int doweb(uw_context ctx, uw_buffer *buf, CURL *c, uw_Basis_string url, int encode_errors, int special_case_404) {
   if (strncmp(url, "https://", 8) && (!allow_http || strncmp(url, "http://", 7)))
@@ -114,7 +128,7 @@ static int doweb(uw_context ctx, uw_buffer *buf, CURL *c, uw_Basis_string url, i
   } 
 }
 
-static uw_Basis_string nonget(const char *verb, uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_string bodyContentType, uw_Basis_string body) {
+static uw_Basis_string nonget(const char *verb, uw_context ctx, uw_Basis_string url, uw_WorldFfi_headers hs, uw_Basis_string bodyContentType, uw_Basis_string body) {
   uw_buffer buf;
   
   uw_Basis_string lastUrl = uw_get_global(ctx, "world.lastUrl");
@@ -142,8 +156,8 @@ static uw_Basis_string nonget(const char *verb, uw_context ctx, uw_Basis_string 
   struct curl_slist *slist = NULL;
   slist = curl_slist_append(slist, "User-Agent: Ur/Web World library");
 
-  if (auth) {
-    uw_Basis_string header = uw_Basis_strcat(ctx, "Authorization: ", auth);
+  for (; hs; hs = hs->next) {
+    uw_Basis_string header = uw_Basis_mstrcat(ctx, hs->header, ": ", hs->value, NULL);
     slist = curl_slist_append(slist, header);
   }
 
@@ -169,23 +183,23 @@ static uw_Basis_string nonget(const char *verb, uw_context ctx, uw_Basis_string 
   return ret;
 }
 
-uw_Basis_string uw_WorldFfi_post(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_string bodyContentType, uw_Basis_string body) {
-  return nonget(NULL, ctx, url, auth, bodyContentType, body);
+uw_Basis_string uw_WorldFfi_post(uw_context ctx, uw_Basis_string url, uw_WorldFfi_headers hs, uw_Basis_string bodyContentType, uw_Basis_string body) {
+  return nonget(NULL, ctx, url, hs, bodyContentType, body);
 }
 
-uw_Basis_string uw_WorldFfi_put(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_string bodyContentType, uw_Basis_string body) {
-  return nonget("PUT", ctx, url, auth, bodyContentType, body);
+uw_Basis_string uw_WorldFfi_put(uw_context ctx, uw_Basis_string url, uw_WorldFfi_headers hs, uw_Basis_string bodyContentType, uw_Basis_string body) {
+  return nonget("PUT", ctx, url, hs, bodyContentType, body);
 }
 
-uw_Basis_string uw_WorldFfi_delete(uw_context ctx, uw_Basis_string url, uw_Basis_string auth) {
-  return nonget("DELETE", ctx, url, auth, NULL, NULL);
+uw_Basis_string uw_WorldFfi_delete(uw_context ctx, uw_Basis_string url, uw_WorldFfi_headers hs) {
+  return nonget("DELETE", ctx, url, hs, NULL, NULL);
 }
 
-uw_Basis_string uw_WorldFfi_patch(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_string bodyContentType, uw_Basis_string body) {
-  return nonget("PATCH", ctx, url, auth, bodyContentType, body);
+uw_Basis_string uw_WorldFfi_patch(uw_context ctx, uw_Basis_string url, uw_WorldFfi_headers hs, uw_Basis_string bodyContentType, uw_Basis_string body) {
+  return nonget("PATCH", ctx, url, hs, bodyContentType, body);
 }
 
-uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_bool encode_errors) {
+uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_WorldFfi_headers hs, uw_Basis_bool encode_errors) {
   uw_buffer buf;
   CURL *c = curl(ctx);
 
@@ -194,8 +208,8 @@ uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_st
   struct curl_slist *slist = NULL;
   slist = curl_slist_append(slist, "User-Agent: Ur/Web World library");
 
-  if (auth) {
-    uw_Basis_string header = uw_Basis_strcat(ctx, "Authorization: ", auth);
+  for (; hs; hs = hs->next) {
+    uw_Basis_string header = uw_Basis_mstrcat(ctx, hs->header, ": ", hs->value, NULL);
     slist = curl_slist_append(slist, header);
   }
 
@@ -213,7 +227,7 @@ uw_Basis_string uw_WorldFfi_get(uw_context ctx, uw_Basis_string url, uw_Basis_st
   return ret;
 }
 
-uw_Basis_string uw_WorldFfi_getOpt(uw_context ctx, uw_Basis_string url, uw_Basis_string auth, uw_Basis_bool encode_errors) {
+uw_Basis_string uw_WorldFfi_getOpt(uw_context ctx, uw_Basis_string url, uw_WorldFfi_headers hs, uw_Basis_bool encode_errors) {
   uw_buffer buf;
   CURL *c = curl(ctx);
   uw_Basis_string ret;
@@ -223,8 +237,8 @@ uw_Basis_string uw_WorldFfi_getOpt(uw_context ctx, uw_Basis_string url, uw_Basis
   struct curl_slist *slist = NULL;
   slist = curl_slist_append(slist, "User-Agent: Ur/Web World library");
 
-  if (auth) {
-    uw_Basis_string header = uw_Basis_strcat(ctx, "Authorization: ", auth);
+  for (; hs; hs = hs->next) {
+    uw_Basis_string header = uw_Basis_mstrcat(ctx, hs->header, ": ", hs->value, NULL);
     slist = curl_slist_append(slist, header);
   }
 

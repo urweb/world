@@ -46,7 +46,7 @@ functor Make(M : S) = struct
     open M
 
     fun withToken {Token = tok, ...} =
-        claims <- WorldFfi.get userinfo_url (Some ("Bearer " ^ tok)) False;
+        claims <- WorldFfi.get userinfo_url (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False;
         claims <- return (fromJson claims : claims);
         name <- return (case claims.Nam of
                             Some name => name

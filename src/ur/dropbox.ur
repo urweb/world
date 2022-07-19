@@ -276,7 +276,7 @@ functor Make(M : AUTH) = struct
 
     fun api url body =
         tok <- token;
-        logged (WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) (Some "application/json") body)
+        logged (WorldFfi.post (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) (Some "application/json") body)
 
     structure FileRequests = struct
         val list =

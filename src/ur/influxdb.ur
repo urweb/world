@@ -83,7 +83,7 @@ functor Make(M : sig
         debug ("  InfluxDB request to: " ^ show url);
         debug ("InfluxDB request body: " ^ body);
         Monad.ignore (WorldFfi.post url
-                                    (Some ("Token " ^ params.ApiToken))
+                                    (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Token " ^ params.ApiToken))
                                     (Some "text/plain; charset=utf-8")
                                     body)
 

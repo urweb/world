@@ -378,17 +378,17 @@ functor Make(M : sig
     fun api url =
         tok <- token;
         debug ("Salesforce GET: " ^ show url);
-        logged (WorldFfi.get url (Some ("Bearer " ^ tok)) False)
+        logged (WorldFfi.get url (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False)
 
     fun apiPost url body =
         tok <- token;
         debug ("Salesforce POST: " ^ show url ^ " - " ^ body);
-        logged (WorldFfi.post url (Some ("Bearer " ^ tok)) (Some "application/json") body)
+        logged (WorldFfi.post url (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) (Some "application/json") body)
 
     fun apiPatch url body =
         tok <- token;
         debug ("Salesforce PATCH: " ^ show url ^ " - " ^ body);
-        logged (WorldFfi.patch url (Some ("Bearer " ^ tok)) (Some "application/json") body)
+        logged (WorldFfi.patch url (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) (Some "application/json") body)
 
     fun idFromUrl url =
         let

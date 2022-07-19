@@ -360,16 +360,16 @@ functor Make(M : AUTH) = struct
 
     fun api url =
         tok <- token;
-        wrap_errcheck (WorldFfi.get (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False)
+        wrap_errcheck (WorldFfi.get (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False)
 
     fun apiOpt url =
         tok <- token;
-        WorldFfi.getOpt (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False
+        WorldFfi.getOpt (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False
 
     fun apiPost url =
         tok <- token;
         debug ("POST request: " ^ prefix ^ url);
-        wrap_errcheck (WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) None "")
+        wrap_errcheck (WorldFfi.post (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) None "")
 
     fun oneJsonField [t ::: Type] (_ : json t) (label : string) (s : string) : t =
         let

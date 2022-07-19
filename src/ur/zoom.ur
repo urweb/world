@@ -801,18 +801,18 @@ functor Make(M : AUTH) = struct
     fun api url =
         tok <- token;
         debug ("Zoom GET: " ^ prefix ^ url);
-        logged (WorldFfi.get (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False)
+        logged (WorldFfi.get (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False)
 
     fun apiOpt url =
         tok <- token;
         debug ("Zoom GET: " ^ prefix ^ url);
-        logged (WorldFfi.getOpt (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) False)
+        logged (WorldFfi.getOpt (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False)
 
     fun apiPost url body =
         tok <- token;
         debug ("Zoom POST: " ^ prefix ^ url);
         debug ("Zoom body: " ^ body);
-        logged (WorldFfi.post (bless (prefix ^ url)) (Some ("Bearer " ^ tok)) (Some "application/json") body)
+        logged (WorldFfi.post (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) (Some "application/json") body)
 
     fun apiPaged [t ::: Type] (_ : json t) (listLabel : string) (url : string) : transaction (list t) =
         let

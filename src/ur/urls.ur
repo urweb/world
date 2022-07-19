@@ -35,7 +35,7 @@ fun urlencode s =
                 let
                     val ch = strsubUtf8 s 0
 
-                    val ch' = if Char.isAlnum ch then
+                    val ch' = if Char.isAlnum ch || ch = #"_" || ch = #"-" || ch = #"." then
                                   str1 ch
                               else
                                   "%" ^ hexchar (ord' ch / 16) ^ hexchar (ord' ch % 16)
@@ -62,7 +62,7 @@ fun urldecode s =
         loop s ""
     end
 
-fun base64url_encode' (getChar : int -> char) (len : int) =
+fun base64url_encode' (getChar : int -> char) (urlVersion : bool) (len : int) =
     let
         fun char n =
             String.str (Char.fromInt (if n < 0 then
@@ -74,9 +74,9 @@ fun base64url_encode' (getChar : int -> char) (len : int) =
                                       else if n < 62 then
                                           Char.toInt #"0" + (n - 52)
                                       else if n = 62 then
-                                          Char.toInt #"-"
+                                          Char.toInt (if urlVersion then #"-" else #"+")
                                       else if n = 63 then
-                                          Char.toInt #"_"
+                                          Char.toInt (if urlVersion then #"_" else #"/")
                                       else
                                           error <xml>Invalid base64 digit</xml>))
 
@@ -131,5 +131,6 @@ fun base64url_encode' (getChar : int -> char) (len : int) =
         bytes 0 ""
     end
 
-fun base64url_encode s = base64url_encode' (String.sub s) (String.length s)
-fun base64url_encode_signature s = base64url_encode' (WorldFfi.byte s) (WorldFfi.length s)
+fun base64url_encode s = base64url_encode' (String.sub s) True (String.length s)
+fun base64url_encode_signature s = base64url_encode' (WorldFfi.byte s) True (WorldFfi.length s)
+fun base64_encode_signature s = base64url_encode' (WorldFfi.byte s) False (WorldFfi.length s)

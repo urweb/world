@@ -57,7 +57,7 @@ functor Make(M : sig
 
     fun api url =
         tok <- token;
-        WorldFfi.get url (Some ("Bearer " ^ tok)) True
+        WorldFfi.get url (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) True
 
     fun apiPaged' [a] (_ : json a) (url : url) : transaction (list a) =
         s <- api url;

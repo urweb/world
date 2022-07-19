@@ -58,7 +58,10 @@ functor Make(M : S) = struct
     open M
 
     fun updateProfile url tokOpt =
-        profile <- WorldFfi.get url (Option.mp (fn s => "token " ^ s) tokOpt) False;
+        profile <- WorldFfi.get url (case tokOpt of
+                                         None => WorldFfi.emptyHeaders
+                                       | Some tok =>
+                                         WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("token " ^ tok)) False;
         (profile : profile) <- return (Json.fromJson profile);
         exists <- oneRowE1 (SELECT COUNT( * ) > 0
                             FROM users

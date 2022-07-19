@@ -357,16 +357,16 @@ functor Make(M : sig
         case tok of
             Some tok => return tok
           | None => error <xml>How odd: no Clearbit token!</xml>
-         
+
     fun api url =
         tok <- token;
-        WorldFfi.get url (Some ("Bearer " ^ tok)) True
+        WorldFfi.get url (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) True
 
     fun addPart url key value =
         return (case value of
                     None => url
                   | Some value => url ^ "&" ^ key ^ "=" ^ urlencode value)
-        
+
     structure Person = struct
         fun lookup r =
             url <- return ("https://person.clearbit.com/v2/people/find?email=" ^ urlencode r.Email);

@@ -100,7 +100,8 @@ functor TwoLegged(M : sig
             header_clset <- return (Urls.base64url_encode header ^ "." ^ Urls.base64url_encode clset);
             signed <- return (WorldFfi.sign_rs256 private_key header_clset);
             assertion <- return (header_clset ^ "." ^ Urls.base64url_encode_signature signed);
-            resp <- WorldFfi.post (bless "https://oauth2.googleapis.com/token") None
+            resp <- WorldFfi.post (bless "https://oauth2.googleapis.com/token")
+                                  WorldFfi.emptyHeaders
                                   (Some "application/x-www-form-urlencoded")
                                   ("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=" ^ assertion);
             resp <- return (fromJson resp : jwt_response);
@@ -152,7 +153,7 @@ functor ThreeLegged(M : sig
         (case hosted_domain of
              None => return ()
            | Some dom =>
-             s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses") (Some ("Bearer " ^ tok)) False;
+             s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses") (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False;
              case (fromJson s : profile).EmailAddresses of
                  [] => error <xml>No e-mail addresses in Google profile.</xml>
                | {Value = addr} :: _ =>
@@ -571,7 +572,7 @@ functor Make(M : AUTH) = struct
             case addro of
                 Some addr => return (Some addr)
               | None =>
-                s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses") (Some ("Bearer " ^ tok)) False;
+                s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses") (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False;
                 case (fromJson s : profile).EmailAddresses of
                     [] => error <xml>No e-mail addresses in Google profile.</xml>
                   | {Value = addr} :: _ =>
@@ -591,7 +592,7 @@ functor Make(M : AUTH) = struct
             case ro of
                 Some r => return (Some {EmailAddress = r.Email, DisplayName = r.DisplayName})
               | None =>
-                s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses,names") (Some ("Bearer " ^ tok)) False;
+                s <- WorldFfi.get (bless "https://people.googleapis.com/v1/people/me?personFields=emailAddresses,names") (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False;
                 p <- return (fromJson s : profile);
                 case p.EmailAddresses of
                     [] => error <xml>No e-mail addresses in Google profile.</xml>
@@ -608,7 +609,7 @@ functor Make(M : AUTH) = struct
     fun api svc url =
         tok <- token;
         debug ("Google GET: " ^ show (api_url svc url));
-        s <- WorldFfi.get (api_url svc url) (Some ("Bearer " ^ tok)) False;
+        s <- WorldFfi.get (api_url svc url) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False;
         debug ("Google response: " ^ s);
         return s
 
@@ -640,7 +641,7 @@ functor Make(M : AUTH) = struct
         tok <- token;
         debug ("Google POST: " ^ show (api_url svc url));
         debug ("Google request: " ^ body);
-        s <- WorldFfi.post (api_url svc url) (Some ("Bearer " ^ tok)) (Some "application/json") body;
+        s <- WorldFfi.post (api_url svc url) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) (Some "application/json") body;
         debug ("Google response: " ^ s);
         return s
 
@@ -648,14 +649,14 @@ functor Make(M : AUTH) = struct
         tok <- token;
         debug ("Google PUT: " ^ show (api_url svc url));
         debug ("Google request: " ^ body);
-        s <- WorldFfi.put (api_url svc url) (Some ("Bearer " ^ tok)) (Some "application/json") body;
+        s <- WorldFfi.put (api_url svc url) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) (Some "application/json") body;
         debug ("Google response: " ^ s);
         return s
 
     fun apiDelete svc url =
         tok <- token;
         debug ("Google DELETE: " ^ show (api_url svc url));
-        s <- WorldFfi.delete (api_url svc url) (Some ("Bearer " ^ tok));
+        s <- WorldFfi.delete (api_url svc url) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok));
         debug ("Google response: " ^ s);
         return s
 

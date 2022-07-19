@@ -15,6 +15,7 @@ api
 urls
 oauth
 scopes
+openAPI
 clearbit
 dropbox
 github
@@ -27,3 +28,4 @@ slack
 zoom
 openIdConnect
 zenefits
+netSuite
