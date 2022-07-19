@@ -69,5 +69,5 @@ val values : chosen ::: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
 functor Make(M : sig
                  val token : transaction (option string)
              end) : sig
-    val metadata : transaction string
+    val metadata : transaction (list stable)
 end

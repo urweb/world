@@ -221,6 +221,12 @@ fun values [chosen ::: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen]
                     (r ++ {Attributes = {Typ = ty}})
 }
 
+type catalog_item = {Nam : string}
+val _ : json catalog_item = json_record {Nam = "name"}
+
+type catalog = {Items : list catalog_item}
+val _ : json catalog = json_record {Items = "items"}
+
 functor Make(M : sig
                  val token : transaction (option string)
              end) = struct
@@ -260,5 +266,6 @@ functor Make(M : sig
                                   "Authorization" auth) False)
 
     val metadata =
-        api "record/v1/metadata-catalog"
+        s <- api "record/v1/metadata-catalog";
+        return (List.mp (fn r => r.Nam) (fromJson s : catalog).Items)
 end

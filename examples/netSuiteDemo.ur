@@ -5,5 +5,7 @@ structure N = NetSuite.Make(NetSuite.TwoLegged(NetSuiteSecrets))
 fun main () =
     md <- N.metadata;
     return <xml><body>
-      <pre>{[md]}</pre>
+      <ol>
+        {List.mapX (fn name => <xml><li>{[name]}</li></xml>) md}
+      </ol>
     </body></xml>
