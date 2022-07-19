@@ -69,5 +69,8 @@ val values : chosen ::: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
 functor Make(M : sig
                  val token : transaction (option string)
              end) : sig
-    val metadata : transaction (list stable)
+    structure Metadata : sig
+        val tables : transaction (list stable)
+        val schema : stable -> transaction OpenAPI.Schema.r
+    end
 end

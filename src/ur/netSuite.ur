@@ -265,7 +265,33 @@ functor Make(M : sig
                                   (WorldFfi.addHeader WorldFfi.emptyHeaders "Prefer" "transient")
                                   "Authorization" auth) False)
 
-    val metadata =
-        s <- api "record/v1/metadata-catalog";
-        return (List.mp (fn r => r.Nam) (fromJson s : catalog).Items)
+    fun apiWithAccept accept path =
+        (acct, key, base, auth) <- token;
+        url <- return (url acct path);
+        auth <- return (auth ^ finishSignature key base "GET" (show url));
+        debug ("NetSuite GET: " ^ show url);
+        logged (WorldFfi.get url
+                             (WorldFfi.addHeader
+                                  (WorldFfi.addHeader
+                                       (WorldFfi.addHeader WorldFfi.emptyHeaders
+                                                           "Accept" accept)
+                                       "Prefer" "transient")
+                                  "Authorization" auth) False)
+
+    structure Metadata = struct
+        val tables =
+            s <- api "record/v1/metadata-catalog";
+            return (List.mp (fn r => r.Nam) (fromJson s : catalog).Items)
+
+        fun schema tname =
+            s <- apiWithAccept "application/swagger+json" ("record/v1/metadata-catalog/" ^ tname);
+            oa <- return (fromJson s : OpenAPI.openapi_spec);
+            case oa.Components of
+                None => error <xml>NetSuite API response includes no components.</xml>
+              | Some {Schemas = None, ...} => error <xml>NetSuite API response includes no schemas.</xml>
+              | Some {Schemas = Some scs, ...} =>
+                case List.assoc tname scs of
+                    None => error <xml>NetSuite API response includes no schema for this table.</xml>
+                  | Some sc => return sc
+    end
 end
