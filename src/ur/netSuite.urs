@@ -51,10 +51,10 @@ val select : chosen :: {Type} -> unchosen ::: {Type} -> rts ::: {{Type}} -> [cho
     => folder chosen
     -> query (chosen ++ unchosen) rts chosen
 val rselect : ts ::: {Type} -> nm :: Name -> rchosen :: {Type} -> runchosen ::: {Type} -> rest ::: {{Type}} -> chosen ::: {Type}
-              -> [rchosen ~ runchosen] => [[nm] ~ rest] => [[nm] ~ chosen]
+              -> [rchosen ~ runchosen] => [[nm] ~ rest] => [rchosen ~ chosen]
               => folder rchosen
               -> query ts ([nm = rchosen ++ runchosen] ++ rest) chosen
-              -> query ts ([nm = rchosen ++ runchosen] ++ rest) ([nm = $rchosen] ++ chosen)
+              -> query ts ([nm = rchosen ++ runchosen] ++ rest) (rchosen ++ chosen)
 val wher : ts ::: {Type} -> rts ::: {{Type}} -> chosen ::: {Type}
            -> exp ts rts bool -> query ts rts chosen -> query ts rts chosen
 val orderByAsc : nm :: Name -> t ::: Type -> r ::: {Type} -> rts ::: {{Type}} -> chosen ::: {Type} -> [[nm] ~ r]
@@ -69,8 +69,19 @@ val values : chosen ::: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
 functor Make(M : sig
                  val token : transaction (option string)
              end) : sig
-    structure Metadata : sig
-        val tables : transaction (list stable)
-        val schema : stable -> transaction OpenAPI.Schema.r
+    functor Table(N : sig
+                      val stable : stable
+                      con fields :: {Type}
+                      val labels : $(map (fn _ => string) fields)
+                      val jsons : $(map Json.json fields)
+                      val fl : folder fields
+
+                      con relations :: {{Type}}
+                      val rlabels : $(map (fn ts => string * string * $(map (fn _ => string) ts)) relations)
+                      val rjsons : $(map (fn ts => $(map Json.json ts)) relations)
+                      val rfl : folder relations
+                      val rfls : $(map folder relations)
+                  end) : sig
+        val query : chosen ::: {Type} -> folder chosen -> query N.fields N.relations chosen -> transaction (list $(map option chosen))
     end
 end

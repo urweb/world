@@ -1,20 +1,28 @@
+open NetSuite
+
 (* For this demo, it's necessary to create netSuiteSecrets.ur,
  * defining [account_id], [consumer_key], [consumer_secret], [token_id], and [token_secret]. *)
 structure N = NetSuite.Make(NetSuite.TwoLegged(NetSuiteSecrets))
 
-fun schema tname =
-    OpenAPI.Schema.Rec s <- N.Metadata.schema tname;
-    case s.Properties of
-        None => error <xml>No properties!</xml>
-      | Some ps =>
-        return <xml><body><ol>
-          {List.mapX (fn (name, OpenAPI.Schema.Rec sc) => <xml><li>{[name]} : {[sc.Typ]}</li></xml>) ps}
-        </ol></body></xml>
+structure C = N.Table(struct
+                          val stable = readError "Contact"
+                          con fields = [Firstname = string,
+                                        Email = string]
+                          val labels = {Firstname = "firstname",
+                                        Email = "email"}
+
+                          con relations = [Company = [CompanyTitle = string]]
+                          val rlabels = {Company = ("company",
+                                                    "entity",
+                                                    {CompanyTitle = "entityTitle"})}
+                          val rjsons = {Company = _}
+                      end)
 
 fun main () =
-    md <- N.Metadata.tables;
+    ls <- C.query (select [[Firstname = _, Email = _]]
+                   |> rselect [#Company] [[CompanyTitle = _]]);
     return <xml><body>
       <ol>
-        {List.mapX (fn name => <xml><li><a link={schema name}>{[name]}</a></li></xml>) md}
+        {List.mapX (fn r => <xml><li>{[r.Firstname]} @ {[r.Email]} @ {[r.CompanyTitle]}</li></xml>) ls}
       </ol>
     </body></xml>

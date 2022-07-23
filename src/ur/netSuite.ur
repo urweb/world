@@ -129,48 +129,53 @@ fun notEq [ts ::: {Type}] [rts ::: {{Type}}] [t ::: Type] (a : exp ts rts t) (b 
     Binop (NotEq, a, b)
 
 type query (full :: {Type}) (rfull :: {{Type}}) (chosen :: {Type}) =
-     {Select : $(map (fn _ => string) full) -> $(map (fn ts => string * $(map (fn _ => string) ts)) rfull) -> string,
-      Json : $(map (fn _ => string) full) -> $(map (fn ts => string * $(map (fn _ => string) ts)) rfull)
+     {Select : string (* this table *) -> $(map (fn _ => string) full) -> $(map (fn ts => string * string * $(map (fn _ => string) ts)) rfull) -> string,
+      From : string -> $(map (fn _ => string) full) -> $(map (fn ts => string * string * $(map (fn _ => string) ts)) rfull) -> string,
+      Json : $(map (fn _ => string) full) -> $(map (fn ts => string * string (* second string is name of table we link to *) * $(map (fn _ => string) ts)) rfull)
              -> $(map json full) -> $(map (fn ts => $(map json ts)) rfull)
              -> $(map (fn t => string * json t) chosen),
       Where : option (exp' full rfull),
       OrderBy : list (variant (map (fn _ => unit) full) * bool)}
 
 fun select [chosen :: {Type}] [unchosen ::: {Type}] [rts ::: {{Type}}] [chosen ~ unchosen] (fl : folder chosen) =
-    {Select = fn labels _ =>
+    {Select = fn this labels _ =>
                  @foldR [fn _ => string] [fn _ => string]
                   (fn [nm ::_] [t ::_] [r ::_] [[nm] ~ r] (l : string) (acc : string) =>
                       if acc = "" then
-                          l
+                          this ^ "." ^ l
                       else
-                          acc ^ "," ^ l)
+                          acc ^ "," ^ this ^ "." ^ l)
                   "" fl (labels --- _),
+     From = fn _ _ _ => "",
      Json = fn labels _ jsons _ =>
                @map2 [fn _ => string] [json] [fn t => string * json t]
-                (fn [t] (l : string) (j : json t) => (l, j))
+                (fn [t] (l : string) (j : json t) => (String.mp Char.toLower l, j))
                 fl (labels --- _) (jsons --- _),
      Where = None,
      OrderBy = []}
 
 fun rselect [ts ::: {Type}] [nm :: Name] [rchosen :: {Type}] [runchosen ::: {Type}]
             [rest ::: {{Type}}] [chosen ::: {Type}]
-            [rchosen ~ runchosen] [[nm] ~ rest] [[nm] ~ chosen]
+            [rchosen ~ runchosen] [[nm] ~ rest] [rchosen ~ chosen]
             (fl : folder rchosen)
             (q : query ts ([nm = rchosen ++ runchosen] ++ rest) chosen) =
-    q -- #Select -- #Json
-      ++ {Select = fn labels (rlabels : $(map (fn ts => string * $(map (fn _ => string) ts)) ([nm = rchosen ++ runchosen] ++ rest))) =>
+    q -- #Select -- #From -- #Json
+      ++ {Select = fn this labels (rlabels : $(map (fn ts => string * string * $(map (fn _ => string) ts)) ([nm = rchosen ++ runchosen] ++ rest))) =>
                       @foldR [fn _ => string] [fn _ => string]
                        (fn [nm' ::_] [t ::_] [r ::_] [[nm'] ~ r] (l : string) (acc : string) =>
                            if acc = "" then
                                l
                            else
-                               acc ^ "," ^ rlabels.nm.1 ^ "." ^ l)
-                       (q.Select labels rlabels) fl (rlabels.nm.2 --- _),
-          Json = fn labels (rlabels : $(map (fn ts => string * $(map (fn _ => string) ts)) ([nm = rchosen ++ runchosen] ++ rest)))
+                               acc ^ "," ^ rlabels.nm.1 ^ "." ^ l ^ " AS " ^ rlabels.nm.1 ^ "_" ^ l)
+                       (q.Select this labels rlabels) fl (rlabels.nm.3 --- _),
+          From = fn this labels (rlabels : $(map (fn ts => string * string * $(map (fn _ => string) ts)) ([nm = rchosen ++ runchosen] ++ rest))) =>
+                    q.From this labels rlabels ^ " LEFT JOIN " ^ rlabels.nm.2 ^ " AS " ^ rlabels.nm.1 ^ " ON " ^ this ^ "." ^ rlabels.nm.1 ^ " = " ^ rlabels.nm.1 ^ ".id",
+          Json = fn labels (rlabels : $(map (fn ts => string * string * $(map (fn _ => string) ts)) ([nm = rchosen ++ runchosen] ++ rest)))
                            jsons (rjsons : $(map (fn ts => $(map json ts)) ([nm = rchosen ++ runchosen] ++ rest))) =>
                     q.Json labels rlabels jsons rjsons
-                           ++ {nm = (rlabels.nm.1,
-                                     @json_record fl (rjsons.nm --- _) (rlabels.nm.2 --- _))}}
+                           ++ @map2 [fn _ => string] [json] [fn t => string * json t]
+                           (fn [t] (l : string) (j : json t) => (String.mp Char.toLower (rlabels.nm.1 ^ "_" ^ l), j))
+                           fl (rlabels.nm.3 --- _) (rjsons.nm --- _)}
 
 fun wher [ts ::: {Type}] [rts ::: {{Type}}] [chosen ::: {Type}] (e : exp ts rts bool) (q : query ts rts chosen) =
     q -- #Where ++ {Where = Some (case q.Where of
@@ -190,16 +195,16 @@ fun vproj [K] [t ::: Type] [r ::: {K}] (fl : folder r) (r : $(map (fn _ => t) r)
              (fn [u] v () => v)
              fl r)
 
-fun vproj' [K] [tf ::: K -> Type] [tf' :: K -> Type] [t ::: Type] [r ::: {K}] (fl : folder r) (r : $(map (fn ts => t * tf ts) r)) (v : variant (map tf' r)) =
-    match v (@Top.mp [fn ts => t * tf ts] [fn ts => tf' ts -> t]
-             (fn [u] (v, _) _ => v)
+fun vproj' [K] [tf ::: K -> Type] [tf' :: K -> Type] [t ::: Type] [r ::: {K}] (fl : folder r) (r : $(map (fn ts => t * t * tf ts) r)) (v : variant (map tf' r)) =
+    match v (@Top.mp [fn ts => t * t * tf ts] [fn ts => tf' ts -> t]
+             (fn [u] (v, _, _) _ => v)
              fl r)
 
 fun vproj2 [t1 ::: Type] [t ::: Type] [r ::: {{Type}}] (fl : folder r) (fls : $(map folder r))
-           (r : $(map (fn ts => t1 * $(map (fn _ => t) ts)) r))
+           (r : $(map (fn ts => t1 * t1 * $(map (fn _ => t) ts)) r))
            (v : variant (map (fn ts => variant (map (fn _ => unit) ts)) r)) =
-    match v (@Top.map2 [folder] [fn ts => t1 * $(map (fn _ => t) ts)] [fn ts => variant (map (fn _ => unit) ts) -> t]
-              (fn [ts] fl' (_, r) v => @vproj fl' r v)
+    match v (@Top.map2 [folder] [fn ts => t1 * t1 * $(map (fn _ => t) ts)] [fn ts => variant (map (fn _ => unit) ts) -> t]
+              (fn [ts] fl' (_, _, r) v => @vproj fl' r v)
               fl fls r)
 
 type values (ts :: {Type}) = {
@@ -221,11 +226,22 @@ fun values [chosen ::: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen]
                     (r ++ {Attributes = {Typ = ty}})
 }
 
-type catalog_item = {Nam : string}
-val _ : json catalog_item = json_record {Nam = "name"}
+type query_request = {
+     Q : string
+}
+val _ : json query_request = json_record {Q = "q"}
 
-type catalog = {Items : list catalog_item}
-val _ : json catalog = json_record {Items = "items"}
+type query_results (r :: Type) = {
+     Items : list r,
+     Count : int,
+     Offset : int,
+     TotalResults : int
+}
+fun json_query_results [r] (_ : json r) : json (query_results r) =
+    json_record {Items = "items",
+                 Count = "count",
+                 Offset = "offset",
+                 TotalResults = "totalResults"}
 
 functor Make(M : sig
                  val token : transaction (option string)
@@ -265,26 +281,127 @@ functor Make(M : sig
                                   (WorldFfi.addHeader WorldFfi.emptyHeaders "Prefer" "transient")
                                   "Authorization" auth) False)
 
-    fun apiWithAccept accept path =
+    fun apiPost path body =
         (acct, key, base, auth) <- token;
         url <- return (url acct path);
-        auth <- return (auth ^ finishSignature key base "GET" (show url));
-        debug ("NetSuite GET: " ^ show url);
-        logged (WorldFfi.get url
+        auth <- return (auth ^ finishSignature key base "POST" (show url));
+        debug ("NetSuite POST: " ^ show url);
+        debug ("Body: " ^ show body);
+        logged (WorldFfi.post url
                              (WorldFfi.addHeader
-                                  (WorldFfi.addHeader
-                                       (WorldFfi.addHeader WorldFfi.emptyHeaders
-                                                           "Accept" accept)
-                                       "Prefer" "transient")
-                                  "Authorization" auth) False)
+                                  (WorldFfi.addHeader WorldFfi.emptyHeaders "Prefer" "transient")
+                                  "Authorization" auth)
+                             (Some "application/json") body)
 
-    structure Metadata = struct
-        val tables =
-            s <- api "record/v1/metadata-catalog";
-            return (List.mp (fn r => r.Nam) (fromJson s : catalog).Items)
+    functor Table(N : sig
+                      val stable : stable
+                      con fields :: {Type}
+                      val labels : $(map (fn _ => string) fields)
+                      val jsons : $(map json fields)
+                      val fl : folder fields
 
-        fun schema tname =
-            s <- apiWithAccept "application/schema+json" ("record/v1/metadata-catalog/" ^ tname);
-            return (fromJson s)
+                      con relations :: {{Type}}
+                      val rlabels : $(map (fn ts => string * string * $(map (fn _ => string) ts)) relations)
+                      val rjsons : $(map (fn ts => $(map Json.json ts)) relations)
+                      val rfl : folder relations
+                      val rfls : $(map folder relations)
+                  end) = struct
+        open N
+
+        fun escapeSingleQuotes s =
+            case s of
+                "" => ""
+              | _ =>
+                let
+                    val ch = String.sub s 0
+                in
+		    (case ch of
+		         #"'" => "\\'"
+		       | #"\\" => "\\\\"
+		       | x => String.str ch)
+                    ^ escapeSingleQuotes (String.suffix s 1)
+                end
+
+        fun formatBinop b =
+            case b of
+                Eq => "="
+              | NotEq => "!="
+              | And => "AND"
+
+        fun allowsParens b =
+            case b of
+                Eq => False
+              | NotEq => False
+              | And => True
+
+        val labelOf = @vproj fl labels
+        fun rlabelOf (rf : variant (map (fn ts => variant (map (fn _ => unit) ts)) relations)) =
+            @@vproj' [fn ts => $(map (fn _ => string) ts)] [fn ts => variant (map (fn _ => unit) ts)]
+              [string] [_]
+              rfl rlabels rf ^ "." ^ @vproj2 rfl rfls rlabels rf
+
+        fun formatExp (e : exp' fields relations) =
+            case e of
+                String s => "'" ^ escapeSingleQuotes s ^ "'"
+              | Null => "NULL"
+              | Field f => labelOf f
+              | RField rf => rlabelOf rf
+              | Binop (b, e1, e2) =>
+                if allowsParens b then
+                    "(" ^ formatExp e1 ^ ")"
+                    ^ formatBinop b
+                    ^ "(" ^ formatExp e2 ^ ")"
+                else
+                    formatExp e1 ^ " "
+                    ^ formatBinop b
+                    ^ " " ^ formatExp e2
+
+        fun formatOrderBy1 (v, b) =
+            labelOf v ^ " " ^ (if b then "ASC" else "DESC")
+
+        fun formatQuery [chosen] (q : query fields relations chosen) =
+            let
+                val qu = "SELECT " ^ q.Select stable labels rlabels ^ " FROM " ^ stable ^ q.From stable labels rlabels
+
+                val qu = case q.Where of
+                             None => qu
+                           | Some e => qu ^ " WHERE " ^ formatExp e
+
+                val qu = case q.OrderBy of
+                             [] => qu
+                           | ob1 :: obs =>
+                             List.foldl (fn ob acc =>
+                                            acc ^ "," ^ formatOrderBy1 ob)
+                             (qu ^ " ORDER BY " ^ formatOrderBy1 ob1) obs
+            in
+                qu
+            end
+
+        fun query [chosen] (fl : folder chosen) (q : query fields relations chosen) =
+            let
+                fun retrieve offset acc =
+                    s <- apiPost ("query/v1/suiteql"
+                                  ^ case offset of
+                                        None => ""
+                                      | Some offset => "?offset=" ^ show offset)
+                                 (toJson {Q = @formatQuery q});
+                    r <- return (@fromJson (@json_query_results (@json_record_withOptional ! _ {} {}
+                                                                  fl
+                                                                  (@mp [fn t => string * json t] [json]
+                                                                    (fn [t] (p : string * json t) => p.2)
+                                                                    fl (q.Json labels rlabels jsons rjsons))
+                                                                  (@mp [fn t => string * json t] [fn _ => string]
+                                                                    (fn [t] (p : string * json t) => p.1)
+                                                                    fl (q.Json labels rlabels jsons rjsons)))) s : query_results $(map option chosen));
+
+                    if r.Offset + r.Count < r.TotalResults then
+                        retrieve (Some (r.Offset + r.Count)) (List.revAppend r.Items acc)
+                    else
+                        case acc of
+                            [] => return r.Items
+                          | _ => return (List.rev (List.revAppend r.Items acc))
+            in
+                retrieve None []
+            end
     end
 end
