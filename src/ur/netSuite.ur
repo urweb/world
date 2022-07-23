@@ -296,6 +296,7 @@ functor Make(M : sig
     functor Table(N : sig
                       val stable : stable
                       con fields :: {Type}
+                      constraint [Id] ~ fields
                       val labels : $(map (fn _ => string) fields)
                       val jsons : $(map json fields)
                       val fl : folder fields
@@ -307,6 +308,7 @@ functor Make(M : sig
                       val rfls : $(map folder relations)
                   end) = struct
         open N
+        con fields' = [Id = string] ++ fields
 
         fun escapeSingleQuotes s =
             case s of
@@ -334,13 +336,16 @@ functor Make(M : sig
               | NotEq => False
               | And => True
 
-        val labelOf = @vproj fl labels
+        val labels = {Id = "Id"} ++ labels
+        val jsons = {Id = _} ++ jsons
+        val fl' : folder fields' = @Folder.cons [#Id] [_] ! fl
+        val labelOf = @vproj fl' labels
         fun rlabelOf (rf : variant (map (fn ts => variant (map (fn _ => unit) ts)) relations)) =
             @@vproj' [fn ts => $(map (fn _ => string) ts)] [fn ts => variant (map (fn _ => unit) ts)]
               [string] [_]
               rfl rlabels rf ^ "." ^ @vproj2 rfl rfls rlabels rf
 
-        fun formatExp (e : exp' fields relations) =
+        fun formatExp (e : exp' fields' relations) =
             case e of
                 String s => "'" ^ escapeSingleQuotes s ^ "'"
               | Null => "NULL"
@@ -359,9 +364,9 @@ functor Make(M : sig
         fun formatOrderBy1 (v, b) =
             labelOf v ^ " " ^ (if b then "ASC" else "DESC")
 
-        fun formatQuery [chosen] (q : query fields relations chosen) =
+        fun formatQuery [chosen] (q : query fields' relations chosen) =
             let
-                val qu = "SELECT " ^ q.Select stable labels rlabels ^ " FROM " ^ stable ^ q.From stable labels rlabels
+                val qu = "SELECT " ^ (q.Select : string -> $(map (fn _ => string) fields') -> $(map (fn ts => string * string * $(map (fn _ => string) ts)) relations) -> string) stable labels rlabels ^ " FROM " ^ stable ^ q.From stable labels rlabels
 
                 val qu = case q.Where of
                              None => qu
@@ -377,7 +382,7 @@ functor Make(M : sig
                 qu
             end
 
-        fun query [chosen] (fl : folder chosen) (q : query fields relations chosen) =
+        fun query [chosen] (fl : folder chosen) (q : query fields' relations chosen) =
             let
                 fun retrieve offset acc =
                     s <- apiPost ("query/v1/suiteql"
@@ -388,11 +393,11 @@ functor Make(M : sig
                     r <- return (@fromJson (@json_query_results (@json_record_withOptional ! _ {} {}
                                                                   fl
                                                                   (@mp [fn t => string * json t] [json]
-                                                                    (fn [t] (p : string * json t) => p.2)
-                                                                    fl (q.Json labels rlabels jsons rjsons))
+                                                                       (fn [t] (p : string * json t) => p.2)
+                                                                       fl (q.Json labels rlabels jsons rjsons))
                                                                   (@mp [fn t => string * json t] [fn _ => string]
-                                                                    (fn [t] (p : string * json t) => p.1)
-                                                                    fl (q.Json labels rlabels jsons rjsons)))) s : query_results $(map option chosen));
+                                                                       (fn [t] (p : string * json t) => p.1)
+                                                                       fl (q.Json labels rlabels jsons rjsons)))) s : query_results $(map option chosen));
 
                     if r.Offset + r.Count < r.TotalResults then
                         retrieve (Some (r.Offset + r.Count)) (List.revAppend r.Items acc)
