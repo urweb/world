@@ -293,6 +293,18 @@ functor Make(M : sig
                                   "Authorization" auth)
                              (Some "application/json") body)
 
+    fun apiPatch path body =
+        (acct, key, base, auth) <- token;
+        url <- return (url acct path);
+        auth <- return (auth ^ finishSignature key base "PATCH" (show url));
+        debug ("NetSuite PATCH: " ^ show url);
+        debug ("Body: " ^ show body);
+        logged (WorldFfi.patch url
+                               (WorldFfi.addHeader
+                                    (WorldFfi.addHeader WorldFfi.emptyHeaders "Prefer" "transient")
+                                    "Authorization" auth)
+                               (Some "application/json") body)
+
     functor Table(N : sig
                       val stable : stable
                       con fields :: {Type}
@@ -408,5 +420,11 @@ functor Make(M : sig
             in
                 retrieve None []
             end
+
+        fun insert vs =
+            Monad.ignore (apiPost ("record/v1/" ^ stable) (vs.Basic labels jsons))
+
+        fun update id vs =
+            Monad.ignore (apiPatch ("record/v1/" ^ stable ^ "/" ^ Urls.urlencode id) (vs.Basic labels jsons))
     end
 end

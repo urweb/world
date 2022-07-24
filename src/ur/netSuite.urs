@@ -86,5 +86,7 @@ functor Make(M : sig
         con fields' = [Id = string] ++ N.fields
 
         val query : chosen ::: {Type} -> folder chosen -> query fields' N.relations chosen -> transaction (list $(map option chosen))
+        val insert : values fields' -> transaction unit
+        val update : string (* object ID *) -> values fields' -> transaction unit
     end
 end
