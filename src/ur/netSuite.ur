@@ -208,22 +208,16 @@ fun vproj2 [t1 ::: Type] [t ::: Type] [r ::: {{Type}}] (fl : folder r) (fls : $(
               fl fls r)
 
 type values (ts :: {Type}) = {
-     Basic : $(map (fn _ => string) ts) -> $(map json ts) -> string,
-     Composite : [[Attributes] ~ ts] => $(map (fn _ => string) ts) -> $(map json ts) -> string (* type *) -> string
+     Basic : $(map (fn _ => string) ts) -> $(map json ts) -> string
 }
 
 fun values [chosen ::: {Type}] [unchosen ::: {Type}] [chosen ~ unchosen]
-           (fl : folder chosen) (r : $chosen) = {
+           (fl : folder chosen) (r : $(map option chosen)) = {
     Basic = fn (labels : $(map (fn _ => string) (chosen ++ unchosen)))
                    (jsons : $(map json (chosen ++ unchosen))) =>
-               @toJson (@json_record fl (jsons --- _) (labels --- _)) r,
-    Composite = fn [[Attributes] ~ (chosen ++ unchosen)]
-                       (labels : $(map (fn _ => string) (chosen ++ unchosen)))
-                       (jsons : $(map json (chosen ++ unchosen))) ty =>
-                   @toJson (@json_record (@Folder.cons [#Attributes] [_] ! fl)
-                             (jsons --- _ ++ {Attributes = json_record {Typ = "type"}})
-                             (labels --- _ ++ {Attributes = "attributes"}))
-                    (r ++ {Attributes = {Typ = ty}})
+               @toJson (@json_record (@Folder.mp fl)
+                         (@mp [json] [fn t => json (option t)] (fn [t] => @json_option) fl (jsons --- _))
+                         (labels --- _)) (r --- _)
 }
 
 type query_request = {

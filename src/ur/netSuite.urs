@@ -64,7 +64,7 @@ val orderByDesc : nm :: Name -> t ::: Type -> r ::: {Type} -> rts ::: {{Type}} -
 
 con values :: {Type} -> Type
 val values : chosen ::: {Type} -> unchosen ::: {Type} -> [chosen ~ unchosen]
-             => folder chosen -> $chosen -> values (chosen ++ unchosen)
+             => folder chosen -> $(map option chosen) -> values (chosen ++ unchosen)
 
 functor Make(M : sig
                  val token : transaction (option string)

@@ -32,12 +32,14 @@ structure C' = N.Table(struct
                            val rjsons = {}
                        end)
 
+val optionify = @@mp [ident] [option] (fn [t] => Some)
+
 fun create r =
-    C'.insert (NetSuite.values r);
+    C'.insert (NetSuite.values (optionify r));
     return <xml><body>OK.</body></xml>
 
 fun update id r =
-    C'.update id (NetSuite.values r);
+    C'.update id (NetSuite.values (optionify r));
     return <xml><body>OK.</body></xml>
 
 fun edit id =
