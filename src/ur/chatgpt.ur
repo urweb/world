@@ -74,7 +74,6 @@ functor Make(M : sig
     val urlPrefix = "https://api.openai.com/v1/"
 
     fun api url body =
-        debug (url ^ ": " ^ body);
         tok <- token;
         WorldFfi.post (bless (urlPrefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) (Some "application/json") body
 
@@ -82,7 +81,9 @@ functor Make(M : sig
         fun completions arg =
             r <- api "chat/completions" (toJson arg);
             case (fromJson r : response).Choices of
-                choice :: [] => return choice.Message.Content
+                {Message = {Content = choice, ...}, ...} :: [] =>
+                debug ("ChatGPT response: " ^ choice);
+                return choice
               | _ => error <xml>Unexpected number of choices in ChatGPT response</xml>
     end
 end
