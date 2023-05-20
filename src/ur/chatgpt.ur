@@ -82,7 +82,6 @@ functor Make(M : sig
             r <- api "chat/completions" (toJson arg);
             case (fromJson r : response).Choices of
                 {Message = {Content = choice, ...}, ...} :: [] =>
-                debug ("ChatGPT response: " ^ choice);
                 return choice
               | _ => error <xml>Unexpected number of choices in ChatGPT response</xml>
     end
