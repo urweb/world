@@ -1,0 +1,10 @@
+library ../src/ur
+rewrite all SmartsheetDemo/*
+database dbname=smartsheetDemo
+sql smartsheetDemo.sql
+safeGetDefault
+allow url https://*
+prefix http://localhost:8080/
+
+smartsheetSecrets
+smartsheetDemo
