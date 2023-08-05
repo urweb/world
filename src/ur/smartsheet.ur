@@ -69,6 +69,7 @@ val _ : json global_template_type = json_derived
                                               | TASK_LIST => "TASK_LIST")
 
 type template_id = int
+val show_template_id = _
 
 type template = {
      Id : option template_id,
@@ -84,7 +85,7 @@ type template = {
 }
 
 val _ : json template = json_record_withOptional
-                            {Nam = "name"}
+			    {Nam = "name"}
                             {Id = "id",
                              Typ = "type",
                              AccessLevel = "accessLevel",
@@ -101,7 +102,32 @@ type templates = {
 
 val _ : json templates = json_record {Data = "data"}
 
+type workspace_id = int
+val show_workspace_id = _
+
+type workspace = {
+     Id : option workspace_id,
+     AccessLevel : option access_level,
+     Favorite : option bool,
+     Nam : string,
+     Permalink : option string
+}
+
+val _ : json workspace = json_record_withOptional
+			     {Nam = "name"}
+			     {Id = "id",
+			      AccessLevel = "accessLevel",
+			      Favorite = "favorite",
+			      Permalink = "permalink"}
+
+type workspaces = {
+     Data : list workspace
+}
+
+val _ : json workspaces = json_record {Data = "data"}
+
 type sheet_id = int
+val show_sheet_id = _
 
 type sheet = {
      Id : option sheet_id,
@@ -149,6 +175,12 @@ functor Make(M : AUTH) = struct
         debug ("Smartsheet POST: " ^ prefix ^ url);
         debug ("Smartsheet body: " ^ body);
         logged (WorldFfi.post (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) (Some "application/json") body)
+
+    structure Workspaces = struct
+        val list =
+            s <- api "workspaces?includeAll=true";
+            return ((fromJson s : workspaces).Data)
+    end
 
     structure Templates = struct
         val list =
