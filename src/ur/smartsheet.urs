@@ -25,8 +25,10 @@ datatype global_template_type =
        | PROJECT_SHEET
        | TASK_LIST
 
+type template_id
+
 type template = {
-     Id : option int,
+     Id : option template_id,
      Typ : option template_type,
      AccessLevel : option access_level,
      Blank : option bool,
@@ -38,8 +40,20 @@ type template = {
      Tags : option (list string)
 }
 
+type sheet_id
+
+type sheet = {
+     Id : option sheet_id,
+     Nam : string,
+     FromId : option template_id
+}
+
 functor Make(M : AUTH) : sig
     structure Templates : sig
         val list : transaction (list template)
+    end
+
+    structure Sheets : sig
+        val createInWorkspace : template_id -> sheet -> transaction sheet_id
     end
 end

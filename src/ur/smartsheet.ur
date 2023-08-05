@@ -68,8 +68,10 @@ val _ : json global_template_type = json_derived
                                               | PROJECT_SHEET => "PROJECT_SHEET"
                                               | TASK_LIST => "TASK_LIST")
 
+type template_id = int
+
 type template = {
-     Id : option int,
+     Id : option template_id,
      Typ : option template_type,
      AccessLevel : option access_level,
      Blank : option bool,
@@ -99,6 +101,28 @@ type templates = {
 
 val _ : json templates = json_record {Data = "data"}
 
+type sheet_id = int
+
+type sheet = {
+     Id : option sheet_id,
+     Nam : string,
+     FromId : option template_id
+}
+val _ : json sheet = json_record_withOptional
+                         {Nam = "name"}
+                         {Id = "id",
+                          FromId = "fromId"}
+
+type result = {
+     Id : sheet_id
+}
+val _ : json result = json_record {Id = "id"}
+
+type response = {
+     Result : result
+}
+val _ : json response = json_record {Result = "result"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -120,9 +144,21 @@ functor Make(M : AUTH) = struct
         debug ("Smartsheet GET: " ^ prefix ^ url);
         logged (WorldFfi.get (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False)
 
+    fun apiPost url body =
+        tok <- token;
+        debug ("Smartsheet POST: " ^ prefix ^ url);
+        debug ("Smartsheet body: " ^ body);
+        logged (WorldFfi.post (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) (Some "application/json") body)
+
     structure Templates = struct
         val list =
             s <- api "templates?includeAll=true";
             return ((fromJson s : templates).Data)
+    end
+
+    structure Sheets = struct
+        fun createInWorkspace wid sh =
+            s <- apiPost ("workspaces/" ^ show wid ^ "/sheets") (toJson sh);
+            return ((fromJson s : response).Result.Id)
     end
 end
