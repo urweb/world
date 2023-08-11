@@ -10,6 +10,14 @@ functor TwoLegged(M : sig
     val token = return (Some M.api_token)
 end
 
+functor TwoLeggedDyn(M : sig
+                         val settings : transaction string
+                     end) = struct
+    val token =
+        tok <- M.settings;
+        return (Some tok)
+end
+
 datatype template_type =
          Report
        | Sheet
@@ -25,76 +33,17 @@ val _ : json template_type = json_derived
                                         Report => "report"
                                       | Sheet => "sheet")
 
-datatype access_level =
-         ADMIN
-       | COMMENTER
-       | EDITOR
-       | EDITOR_SHARE
-       | OWNER
-       | VIEWER
-
-val _ : json access_level = json_derived
-                                (fn x => case x of
-                                             "ADMIN" => ADMIN
-                                           | "COMMENTER" => COMMENTER
-                                           | "EDITOR" => EDITOR
-                                           | "EDITOR_SHARE" => EDITOR_SHARE
-                                           | "OWNER" => OWNER
-                                           | "VIEWER" => VIEWER
-                                           | _ => error <xml>Bad Smartsheet access level {[x]}</xml>)
-                                (fn x =>
-                                    case x of
-                                        ADMIN => "ADMIN"
-                                      | COMMENTER => "COMMENTER"
-                                      | EDITOR => "EDITOR"
-                                      | EDITOR_SHARE => "EDITOR_SHARE"
-                                      | OWNER => "OWNER"
-                                      | VIEWER => "VIEWER")
-
-datatype global_template_type =
-         BLANK_SHEET
-       | PROJECT_SHEET
-       | TASK_LIST
-
-val _ : json global_template_type = json_derived
-                                        (fn x => case x of
-                                                     "BLANK_SHEET" => BLANK_SHEET
-                                                   | "PROJECT_SHEET" => PROJECT_SHEET
-                                                   | "TASK_LIST" => TASK_LIST
-                                                   | _ => error <xml>Bad Smartsheet global template type {[x]}</xml>)
-                                        (fn x =>
-                                            case x of
-                                                BLANK_SHEET => "BLANK_SHEET"
-                                              | PROJECT_SHEET => "PROJECT_SHEET"
-                                              | TASK_LIST => "TASK_LIST")
-
 type template_id = int
 val show_template_id = _
 
 type template = {
      Id : option template_id,
-     Typ : option template_type,
-     AccessLevel : option access_level,
-     Blank : option bool,
-     Categories : option (list string),
-     GlobalTemplate : option global_template_type,
-     Image : option string,
-     LargeImage : option string,
-     Nam : string,
-     Tags : option (list string)
+     Nam : string
 }
 
 val _ : json template = json_record_withOptional
 			    {Nam = "name"}
-                            {Id = "id",
-                             Typ = "type",
-                             AccessLevel = "accessLevel",
-                             Blank = "blank",
-                             Categories = "categories",
-                             GlobalTemplate = "globalTemplate",
-                             Image = "image",
-                             LargeImage = "largeImage",
-                             Tags = "tags"}
+                            {Id = "id"}
 
 type templates = {
      Data : list template
@@ -105,80 +54,6 @@ val _ : json templates = json_record {Data = "data"}
 type column_id = int
 val show_column_id = _
 
-datatype system_column_type =
-         AUTO_NUMBER
-       | CREATED_BY
-       | CREATED_DATE
-       | MODIFIED_BY
-       | MODIFIED_DATE
-
-val _ : json system_column_type = json_derived
-                                      (fn x =>
-                                          case x of
-                                              "AUTO_NUMBER" => AUTO_NUMBER
-                                            | "CREATED_BY" => CREATED_BY
-                                            | "CREATED_DATE" => CREATED_DATE
-                                            | "MODIFIED_BY" => MODIFIED_BY
-                                            | "MODIFIED_DATE" => MODIFIED_DATE
-                                            | _ => error <xml>Bad Smartsheet system column type {[x]}</xml>)
-                                      (fn x =>
-                                          case x of
-                                              AUTO_NUMBER => "AUTO_NUMBER"
-                                            | CREATED_BY => "CREATED_BY"
-                                            | CREATED_DATE => "CREATED_DATE"
-                                            | MODIFIED_BY => "MODIFIED_BY"
-                                            | MODIFIED_DATE => "MODIFIED_DATE")
-
-datatype column_tag =
-         CALENDAR_END_DATE
-       | CALENDAR_START_DATE
-       | CARD_DONE
-       | GANTT_ALLOCATION
-       | GANTT_ASSIGNED_RESOURCE
-       | GANTT_DISPLAY_LABEL
-       | GANTT_DURATION
-       | GANTT_END_DATE
-       | GANTT_PERCENT_COMPLETE
-       | GANTT_PREDECESSOR
-       | GANTT_START_DATE
-       | BASELINE_START_DATE
-       | BASELINE_END_DATE
-       | BASELINE_VARIANCE
-
-val _ : json column_tag = json_derived
-                          (fn x =>
-                              case x of
-                                  "CALENDAR_END_DATE" => CALENDAR_END_DATE
-                                | "CALENDAR_START_DATE" => CALENDAR_START_DATE
-                                | "CARD_DONE" => CARD_DONE
-                                | "GANTT_ALLOCATION" => GANTT_ALLOCATION
-                                | "GANTT_ASSIGNED_RESOURCES" => GANTT_ASSIGNED_RESOURCE
-                                | "GANTT_DISPLAY_LABEL" => GANTT_DISPLAY_LABEL
-                                | "GANTT_DURATION" => GANTT_DURATION
-                                | "GANTT_END_DATE" => GANTT_END_DATE
-                                | "GANTT_PERCENT_COMPLETE" => GANTT_PERCENT_COMPLETE
-                                | "GANTT_PREDECESSOR" => GANTT_PREDECESSOR
-                                | "GANTT_START_DATE" => GANTT_START_DATE
-                                | "BASELINE_START_DATE" => BASELINE_START_DATE
-                                | "BASELINE_END_DATE" => BASELINE_END_DATE
-                                | "BASELINE_VARIANCE" => BASELINE_VARIANCE
-                                | _ => error <xml>Bad Smartsheet column tag {[x]}</xml>)
-                          (fn x =>
-                              case x of
-                                  CALENDAR_END_DATE => "CALENDAR_END_DATE"
-                                | CALENDAR_START_DATE => "CALENDAR_START_DATE"
-                                | CARD_DONE => "CARD_DONE"
-                                | GANTT_ALLOCATION => "GANTT_ALLOCATION"
-                                | GANTT_ASSIGNED_RESOURCE => "GANTT_ASSIGNED_RESOURCE"
-                                | GANTT_DISPLAY_LABEL => "GANTT_DISPLAY_LABEL"
-                                | GANTT_DURATION => "GANTT_DURATION"
-                                | GANTT_END_DATE => "GANTT_END_DATE"
-                                | GANTT_PERCENT_COMPLETE => "GANTT_PERCENT_COMPLETE"
-                                | GANTT_PREDECESSOR => "GANTT_PREDECESSOR"
-                                | GANTT_START_DATE => "GANTT_START_DATE"
-                                | BASELINE_START_DATE => "BASELINE_START_DATE"
-                                | BASELINE_END_DATE => "BASELINE_END_DATE"
-                                | BASELINE_VARIANCE => "BASELINE_VARIANCE")
 
 datatype column_type =
          ABSTRACT_DATETIME
@@ -222,40 +97,14 @@ val _ : json column_type = json_derived
                                  | PREDECESSOR => "PREDECESSOR"
                                  | TEXT_NUMBER => "TEXT_NUMBER")
 
-datatype column_version =
-         Column0
-       | Column1
-       | Column2
-
-val _ : json column_version = json_derived
-                              (fn x =>
-                                  case x of
-                                      0 => Column0
-                                    | 1 => Column1
-                                    | 2 => Column2
-                                    | _ => error <xml>Bad Smartsheet column version {[x]}</xml>)
-                              (fn x =>
-                                  case x of
-                                      Column0 => 0
-                                    | Column1 => 1
-                                    | Column2 => 2)
-
 type column = {
      Id : option column_id,
      Description : option string,
      Hidden : option bool,
      Index : option int,
-     Locked : option bool,
-     LockedForUser : option bool,
      Primary : option bool,
-     Symbol : option string,
-     SystemColumnType : option system_column_type,
-     Tags : option (list column_tag),
      Title : option string,
-     Typ : option column_type,
-     Validation : option bool,
-     Version : option column_version,
-     Width : option int
+     Typ : option column_type
 }
 
 val _ : json column = json_record_withOptional
@@ -264,47 +113,25 @@ val _ : json column = json_record_withOptional
                            Description = "description",
                            Hidden = "hidden",
                            Index = "index",
-                           Locked = "locked",
-                           LockedForUser = "lockedForUser",
                            Primary = "primary",
-                           Symbol = "symbol",
-                           SystemColumnType = "systemColumnType",
-                           Tags = "tags",
-                           Typ = "type",
-                           Validation = "validation",
-                           Version = "version",
-                           Width = "width"}
+                           Typ = "type"}
 
 type cell_id = int
 val show_cell_id = _
 
 type cell = {
      ColumnId : option column_id,
-     ColumnType : option string,
-     ConditionalFormat : option string,
-     DisplayValue : option string,
-     Format : option string,
-     Formula : option string,
-     Strict : option string,
      Value : option Json.prim
 }
 
 val _ : json cell = json_record_withOptional
                         {}
                         {ColumnId = "columnId",
-                         ColumnType = "columnType",
-                         ConditionalFormat = "conditionalFormat",
-                         DisplayValue = "displayValue",
-                         Format = "format",
-                         Formula = "formula",
-                         Strict = "strict",
                          Value = "value"}
 
 type sheet_id = int
 val show_sheet_id = _
-
-type user_id = int
-val show_user_id = _
+val inj_sheet_id = _
 
 type row_id = int
 val show_row_id = _
@@ -312,43 +139,23 @@ val show_row_id = _
 type row = {
      Id : option row_id,
      SheetId : option sheet_id,
-     AccessLevel : option access_level,
      Cells : option (list cell),
      Columns : option (list column),
-     ConditionalFormat : option string,
-     Expanded : option bool,
-     FilteredOut : option bool,
-     Format : option string,
-     InCriticalPath : option bool,
-     Locked : option bool,
-     LockedForUser : option bool,
-     RowNumber : option int,
-     Version : option int
+     RowNumber : option int
 }
 
 val _ : json row = json_record_withOptional
                        {}
                        {Id = "id",
                         SheetId = "sheetId",
-                        AccessLevel = "accessLevel",
                         Cells = "cells",
                         Columns = "columns",
-                        ConditionalFormat = "conditionalFormat",
-                        Expanded = "expanded",
-                        FilteredOut = "filteredOut",
-                        Format = "format",
-                        InCriticalPath = "inCriticalPath",
-                        Locked = "locked",
-                        LockedForUser = "lockedForUser",
-                        RowNumber = "rowNumber",
-                        Version = "version"}
+                        RowNumber = "rowNumber"}
 
 type sheet = {
      Id : option sheet_id,
      Nam : string,
      FromId : option template_id,
-     OwnerId : option user_id,
-     AccessLevel : option access_level,
      Columns : option (list column),
      Rows : option (list row)
 }
@@ -357,8 +164,6 @@ val _ : json sheet = json_record_withOptional
                          {Nam = "name"}
                          {Id = "id",
                           FromId = "fromId",
-                          OwnerId = "ownerId",
-                          AccessLevel = "accessLevel",
                           Columns = "columns",
                           Rows = "rows"}
 
@@ -367,18 +172,12 @@ val show_workspace_id = _
 
 type workspace = {
      Id : option workspace_id,
-     AccessLevel : option access_level,
-     Favorite : option bool,
-     Nam : string,
-     Permalink : option string
+     Nam : string
 }
 
 val _ : json workspace = json_record_withOptional
 			     {Nam = "name"}
-			     {Id = "id",
-			      AccessLevel = "accessLevel",
-			      Favorite = "favorite",
-			      Permalink = "permalink"}
+			     {Id = "id"}
 
 type workspaces = {
      Data : list workspace
