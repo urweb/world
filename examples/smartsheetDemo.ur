@@ -28,9 +28,34 @@ fun template tid =
       </ul>
     </body></xml>
 
+fun sheet sid =
+    sh <- Z.Sheets.get sid;
+    return <xml><body>
+      <h2>Columns</h2>
+      <table>
+        <tr> <th>ID</th> <th>Name</th> <th>Type</th> </tr>
+        {List.mapX (fn c => <xml><tr>
+          <td>{[c.Title]}</td>
+          <td>{[case c.Typ of
+                    Some Smartsheet.TEXT_NUMBER => "default"
+                  | Some Smartsheet.CHECKBOX => "bool"
+                  | _ => "other"]}</td>
+        </tr></xml>) (Option.get [] sh.Columns)}
+      </table>
+    </body></xml>
+
 val main =
+    shs <- Z.Sheets.list;
     ts <- Z.Templates.list;
     return <xml><body>
+      <h2>Sheets</h2>
+      <ul>
+        {List.mapX (fn r =>
+		       case r.Id of
+			   None => error <xml>No ID returned for sheet</xml>
+			 | Some sid => <xml><li><a link={sheet sid}>{[r.Nam]}</a></li></xml>) shs}
+      </ul>
+
       <h2>Templates</h2>
       <ul>
         {List.mapX (fn r =>

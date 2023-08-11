@@ -52,13 +52,81 @@ type template = {
      Tags : option (list string)
 }
 
+type column_id
+val show_column_id : show column_id
+
+datatype system_column_type =
+         AUTO_NUMBER
+       | CREATED_BY
+       | CREATED_DATE
+       | MODIFIED_BY
+       | MODIFIED_DATE
+
+datatype column_tag =
+         CALENDAR_END_DATE
+       | CALENDAR_START_DATE
+       | CARD_DONE
+       | GANTT_ALLOCATION
+       | GANTT_ASSIGNED_RESOURCE
+       | GANTT_DISPLAY_LABEL
+       | GANTT_DURATION
+       | GANTT_END_DATE
+       | GANTT_PERCENT_COMPLETE
+       | GANTT_PREDECESSOR
+       | GANTT_START_DATE
+       | BASELINE_START_DATE
+       | BASELINE_END_DATE
+       | BASELINE_VARIANCE
+
+datatype column_type =
+         ABSTRACT_DATETIME
+       | CHECKBOX
+       | CONTACT_LIST
+       | DATE
+       | DATETIME
+       | DURATION
+       | MULTI_CONTACT_LIST
+       | MULTI_PICKLIST
+       | PICKLIST
+       | PREDECESSOR
+       | TEXT_NUMBER
+
+datatype column_version =
+         Column0
+       | Column1
+       | Column2
+
+type column = {
+     Id : option column_id,
+     Description : option string,
+     Hidden : option bool,
+     Index : option int,
+     Locked : option bool,
+     LockedForUser : option bool,
+     Primary : option bool,
+     Symbol : option string,
+     SystemColumnType : option system_column_type,
+     Tags : option (list column_tag),
+     Title : option string,
+     Typ : option column_type,
+     Validation : option bool,
+     Version : option column_version,
+     Width : option int
+}
+
 type sheet_id
 val show_sheet_id : show sheet_id
+
+type user_id
+val show_user_id : show user_id
 
 type sheet = {
      Id : option sheet_id,
      Nam : string,
-     FromId : option template_id
+     FromId : option template_id,
+     OwnerId : option user_id,
+     AccessLevel : option access_level,
+     Columns : option (list column)
 }
 
 functor Make(M : AUTH) : sig
@@ -71,6 +139,8 @@ functor Make(M : AUTH) : sig
     end
 
     structure Sheets : sig
+        val list : transaction (list sheet)
+        val get : sheet_id -> transaction sheet
         val createInWorkspace : workspace_id -> sheet -> transaction sheet_id
     end
 end
