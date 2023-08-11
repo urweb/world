@@ -114,11 +114,45 @@ type column = {
      Width : option int
 }
 
+type cell_id
+val show_cell_id : show cell_id
+
+type cell = {
+     ColumnId : option column_id,
+     ColumnType : option string,
+     ConditionalFormat : option string,
+     DisplayValue : option string,
+     Format : option string,
+     Formula : option string,
+     Strict : option string,
+     Value : option Json.prim
+}
+
 type sheet_id
 val show_sheet_id : show sheet_id
 
 type user_id
 val show_user_id : show user_id
+
+type row_id
+val show_row_id : show row_id
+
+type row = {
+     Id : option row_id,
+     SheetId : option sheet_id,
+     AccessLevel : option access_level,
+     Cells : option (list cell),
+     Columns : option (list column),
+     ConditionalFormat : option string,
+     Expanded : option bool,
+     FilteredOut : option bool,
+     Format : option string,
+     InCriticalPath : option bool,
+     Locked : option bool,
+     LockedForUser : option bool,
+     RowNumber : option int,
+     Version : option int
+}
 
 type sheet = {
      Id : option sheet_id,
@@ -126,7 +160,8 @@ type sheet = {
      FromId : option template_id,
      OwnerId : option user_id,
      AccessLevel : option access_level,
-     Columns : option (list column)
+     Columns : option (list column),
+     Rows : option (list row)
 }
 
 functor Make(M : AUTH) : sig

@@ -42,6 +42,13 @@ fun sheet sid =
                   | _ => "other"]}</td>
         </tr></xml>) (Option.get [] sh.Columns)}
       </table>
+
+      <h2>Rows</h2>
+      <table>
+        {List.mapX (fn r => <xml><tr>
+          {List.mapX (fn c => <xml><td>{[c.Value]}</td></xml>) (Option.get [] r.Cells)}
+        </tr></xml>) (Option.get [] sh.Rows)}
+      </table>
     </body></xml>
 
 val main =

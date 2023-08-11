@@ -275,11 +275,73 @@ val _ : json column = json_record_withOptional
                            Version = "version",
                            Width = "width"}
 
+type cell_id = int
+val show_cell_id = _
+
+type cell = {
+     ColumnId : option column_id,
+     ColumnType : option string,
+     ConditionalFormat : option string,
+     DisplayValue : option string,
+     Format : option string,
+     Formula : option string,
+     Strict : option string,
+     Value : option Json.prim
+}
+
+val _ : json cell = json_record_withOptional
+                        {}
+                        {ColumnId = "columnId",
+                         ColumnType = "columnType",
+                         ConditionalFormat = "conditionalFormat",
+                         DisplayValue = "displayValue",
+                         Format = "format",
+                         Formula = "formula",
+                         Strict = "strict",
+                         Value = "value"}
+
 type sheet_id = int
 val show_sheet_id = _
 
 type user_id = int
 val show_user_id = _
+
+type row_id = int
+val show_row_id = _
+
+type row = {
+     Id : option row_id,
+     SheetId : option sheet_id,
+     AccessLevel : option access_level,
+     Cells : option (list cell),
+     Columns : option (list column),
+     ConditionalFormat : option string,
+     Expanded : option bool,
+     FilteredOut : option bool,
+     Format : option string,
+     InCriticalPath : option bool,
+     Locked : option bool,
+     LockedForUser : option bool,
+     RowNumber : option int,
+     Version : option int
+}
+
+val _ : json row = json_record_withOptional
+                       {}
+                       {Id = "id",
+                        SheetId = "sheetId",
+                        AccessLevel = "accessLevel",
+                        Cells = "cells",
+                        Columns = "columns",
+                        ConditionalFormat = "conditionalFormat",
+                        Expanded = "expanded",
+                        FilteredOut = "filteredOut",
+                        Format = "format",
+                        InCriticalPath = "inCriticalPath",
+                        Locked = "locked",
+                        LockedForUser = "lockedForUser",
+                        RowNumber = "rowNumber",
+                        Version = "version"}
 
 type sheet = {
      Id : option sheet_id,
@@ -287,7 +349,8 @@ type sheet = {
      FromId : option template_id,
      OwnerId : option user_id,
      AccessLevel : option access_level,
-     Columns : option (list column)
+     Columns : option (list column),
+     Rows : option (list row)
 }
 
 val _ : json sheet = json_record_withOptional
@@ -296,7 +359,8 @@ val _ : json sheet = json_record_withOptional
                           FromId = "fromId",
                           OwnerId = "ownerId",
                           AccessLevel = "accessLevel",
-                          Columns = "columns"}
+                          Columns = "columns",
+                          Rows = "rows"}
 
 type workspace_id = int
 val show_workspace_id = _
