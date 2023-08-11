@@ -1,9 +1,9 @@
 (* For this demo, it's necessary to create smartsheetSecrets.ur,
  * defining [api_token]. *)
-structure Z = Smartsheet.Make(Smartsheet.TwoLegged(SmartsheetSecrets))
+structure S = Smartsheet.Make(Smartsheet.TwoLegged(SmartsheetSecrets))
 
 fun create tid wid r =
-    sid <- Z.Sheets.createInWorkspace wid ({Nam = r.Nam} ++ Api.optionals {FromId = tid});
+    sid <- S.Sheets.createInWorkspace wid ({Nam = r.Nam} ++ Api.optionals {FromId = tid});
     return <xml><body>
       I created sheet #{[sid]}.
     </body></xml>
@@ -17,7 +17,7 @@ fun workspace tid wid =
     </body></xml>
 
 fun template tid =
-    ws <- Z.Workspaces.list;
+    ws <- S.Workspaces.list;
     return <xml><body>
       <h2>Workspaces</h2>
       <ul>
@@ -28,12 +28,28 @@ fun template tid =
       </ul>
     </body></xml>
 
+datatype input_widget = StringWidget of source string | BoolWidget of source bool
+
+fun addRow sid cs =
+    Monad.ignore (S.Rows.add sid (Api.optionals {Cells = cs} :: []))
+
 fun sheet sid =
-    sh <- Z.Sheets.get sid;
+    sh <- S.Sheets.get sid;
+    ws <- List.mapM (fn c =>
+                        case (c.Id, c.Title) of
+                            (Some cid, Some ttl) =>
+                            (case c.Typ of
+                                 Some Smartsheet.CHECKBOX =>
+                                 s <- source False;
+                                 return (cid, ttl, BoolWidget s)
+                               | _ =>
+                                 s <- source "";
+                                 return (cid, ttl, StringWidget s))
+                          | _ => error <xml>Missing column info</xml>) (Option.get [] sh.Columns);
     return <xml><body>
       <h2>Columns</h2>
       <table>
-        <tr> <th>ID</th> <th>Name</th> <th>Type</th> </tr>
+        <tr> <th>Name</th> <th>Type</th> </tr>
         {List.mapX (fn c => <xml><tr>
           <td>{[c.Title]}</td>
           <td>{[case c.Typ of
@@ -49,11 +65,36 @@ fun sheet sid =
           {List.mapX (fn c => <xml><td>{[c.Value]}</td></xml>) (Option.get [] r.Cells)}
         </tr></xml>) (Option.get [] sh.Rows)}
       </table>
+
+      <h2>New row</h2>
+
+      <table>
+        {List.mapX (fn (_, ttl, w) => <xml><tr>
+          <th>{[ttl]}</th>
+          <td>{case w of
+                   StringWidget s => <xml><ctextbox source={s}/></xml>
+                 | BoolWidget s => <xml><ccheckbox source={s}/></xml>}</td>
+        </tr></xml>) ws}
+      </table>
+
+      <button value="Create"
+              onclick={fn _ =>
+                          cs <- List.mapM (fn (cid, _, w) =>
+                                              v <- (case w of
+                                                        StringWidget s =>
+                                                        v <- get s;
+                                                        return (Json.String v)
+                                                      | BoolWidget s =>
+                                                        v <- get s;
+                                                        return (Json.Bool v));
+                                              return (Api.optionals {ColumnId = cid,
+                                                                     Value = v})) ws;
+                          rpc (addRow sid cs)}/>
     </body></xml>
 
 val main =
-    shs <- Z.Sheets.list;
-    ts <- Z.Templates.list;
+    shs <- S.Sheets.list;
+    ts <- S.Templates.list;
     return <xml><body>
       <h2>Sheets</h2>
       <ul>

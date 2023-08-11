@@ -402,6 +402,12 @@ type sheets = {
 
 val _ : json sheets = json_record {Data = "data"}
 
+type add_response = {
+     Result : list row
+}
+
+val _ : json add_response = json_record {Result = "result"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -453,5 +459,11 @@ functor Make(M : AUTH) = struct
         fun createInWorkspace wid sh =
             s <- apiPost ("workspaces/" ^ show wid ^ "/sheets") (toJson sh);
             return ((fromJson s : response).Result.Id)
+    end
+
+    structure Rows = struct
+        fun add sid rs =
+            s <- apiPost ("sheets/" ^ show sid ^ "/rows") (toJson rs);
+            return ((fromJson s : add_response).Result)
     end
 end

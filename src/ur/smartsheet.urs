@@ -178,4 +178,8 @@ functor Make(M : AUTH) : sig
         val get : sheet_id -> transaction sheet
         val createInWorkspace : workspace_id -> sheet -> transaction sheet_id
     end
+
+    structure Rows : sig
+        val add : sheet_id -> list row -> transaction (list row)
+    end
 end
