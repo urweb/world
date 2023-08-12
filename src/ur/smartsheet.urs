@@ -32,6 +32,7 @@ type template = {
 
 type column_id
 val show_column_id : show column_id
+val eq_column_id : eq column_id
 
 datatype column_type =
          ABSTRACT_DATETIME

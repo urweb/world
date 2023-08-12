@@ -53,7 +53,7 @@ val _ : json templates = json_record {Data = "data"}
 
 type column_id = int
 val show_column_id = _
-
+val eq_column_id = _
 
 datatype column_type =
          ABSTRACT_DATETIME
