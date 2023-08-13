@@ -101,7 +101,9 @@ val main =
         {List.mapX (fn r =>
 		       case r.Id of
 			   None => error <xml>No ID returned for sheet</xml>
-			 | Some sid => <xml><li><a link={sheet sid}>{[r.Nam]}</a></li></xml>) shs}
+			 | Some sid => <xml><li><a link={sheet sid}>{[r.Nam]}</a>{case r.Source of
+                                                                                      None => <xml></xml>
+                                                                                    | Some s => <xml> (from {[s.Id]})</xml>}</li></xml>) shs}
       </ul>
 
       <h2>Templates</h2>

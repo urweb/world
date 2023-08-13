@@ -24,6 +24,8 @@ type workspace = {
 
 type template_id
 val show_template_id : show template_id
+val eq_template_id : eq template_id
+val template_id : int -> template_id
 
 type template = {
      Id : option template_id,
@@ -80,12 +82,20 @@ type row = {
      RowNumber : option int
 }
 
+datatype source_type = Report | Sheet | Sight | Template
+
+type source = {
+     Id : int,
+     Typ : source_type
+}
+
 type sheet = {
      Id : option sheet_id,
      Nam : string,
      FromId : option template_id,
      Columns : option (list column),
-     Rows : option (list row)
+     Rows : option (list row),
+     Source : option source
 }
 
 functor Make(M : AUTH) : sig

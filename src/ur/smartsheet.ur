@@ -35,6 +35,8 @@ val _ : json template_type = json_derived
 
 type template_id = int
 val show_template_id = _
+val eq_template_id = _
+fun template_id x = x
 
 type template = {
      Id : option template_id,
@@ -152,12 +154,36 @@ val _ : json row = json_record_withOptional
                         Columns = "columns",
                         RowNumber = "rowNumber"}
 
+datatype source_type = Report | Sheet | Sight | Template
+
+val _ : json source_type = json_derived
+                               (fn x =>
+                                   case x of
+                                       "report" => Report
+                                     | "sheet" => Sheet
+                                     | "sight" => Sight
+                                     | "template" => Template
+                                     | _ => error <xml>Bad Smartsheet source type {[x]}</xml>)
+                               (fn x =>
+                                   case x of
+                                       Report => "report"
+                                     | Sheet => "sheet"
+                                     | Sight => "sight"
+                                     | Template => "template")
+
+type source = {
+     Id : int,
+     Typ : source_type
+}
+val _ : json source = json_record {Id = "id", Typ = "type"}
+
 type sheet = {
      Id : option sheet_id,
      Nam : string,
      FromId : option template_id,
      Columns : option (list column),
-     Rows : option (list row)
+     Rows : option (list row),
+     Source : option source
 }
 
 val _ : json sheet = json_record_withOptional
@@ -165,7 +191,8 @@ val _ : json sheet = json_record_withOptional
                          {Id = "id",
                           FromId = "fromId",
                           Columns = "columns",
-                          Rows = "rows"}
+                          Rows = "rows",
+                          Source = "source"}
 
 type workspace_id = int
 val show_workspace_id = _
@@ -248,7 +275,7 @@ functor Make(M : AUTH) = struct
 
     structure Sheets = struct
         val list =
-            s <- api "sheets?includeAll=true";
+            s <- api "sheets?includeAll=true&include=source";
             return ((fromJson s : sheets).Data)
 
         fun get id =
