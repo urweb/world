@@ -16,6 +16,8 @@ end
 
 type workspace_id
 val show_workspace_id : show workspace_id
+val inj_workspace_id : sql_injectable_prim workspace_id
+val workspace_id : int -> workspace_id
 
 type workspace = {
      Id : option workspace_id,
@@ -25,6 +27,7 @@ type workspace = {
 type template_id
 val show_template_id : show template_id
 val eq_template_id : eq template_id
+val inj_template_id : sql_injectable_prim template_id
 val template_id : int -> template_id
 
 type template = {
@@ -111,6 +114,7 @@ functor Make(M : AUTH) : sig
         val list : transaction (list sheet)
         val get : sheet_id -> transaction sheet
         val createInWorkspace : workspace_id -> sheet -> transaction sheet_id
+        val delete : sheet_id -> transaction unit
     end
 
     structure Rows : sig

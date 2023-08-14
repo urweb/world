@@ -36,6 +36,7 @@ val _ : json template_type = json_derived
 type template_id = int
 val show_template_id = _
 val eq_template_id = _
+val inj_template_id = _
 fun template_id x = x
 
 type template = {
@@ -196,6 +197,8 @@ val _ : json sheet = json_record_withOptional
 
 type workspace_id = int
 val show_workspace_id = _
+val inj_workspace_id = _
+fun workspace_id n = n
 
 type workspace = {
      Id : option workspace_id,
@@ -261,6 +264,11 @@ functor Make(M : AUTH) = struct
         debug ("Smartsheet body: " ^ body);
         logged (WorldFfi.post (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) (Some "application/json") body)
 
+    fun apiDelete url =
+        tok <- token;
+        debug ("Smartsheet DELETE: " ^ prefix ^ url);
+        logged (WorldFfi.delete (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)))
+
     structure Workspaces = struct
         val list =
             s <- api "workspaces?includeAll=true";
@@ -285,6 +293,9 @@ functor Make(M : AUTH) = struct
         fun createInWorkspace wid sh =
             s <- apiPost ("workspaces/" ^ show wid ^ "/sheets") (toJson sh);
             return ((fromJson s : response).Result.Id)
+
+        fun delete id =
+            Monad.ignore (apiDelete ("sheets/" ^ show id))
     end
 
     structure Rows = struct
