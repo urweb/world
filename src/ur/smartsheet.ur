@@ -135,6 +135,7 @@ val _ : json cell = json_record_withOptional
 type sheet_id = int
 val show_sheet_id = _
 val inj_sheet_id = _
+fun sheet_id n = n
 
 type row_id = int
 val show_row_id = _

@@ -73,6 +73,7 @@ type cell = {
 type sheet_id
 val show_sheet_id : show sheet_id
 val inj_sheet_id : sql_injectable_prim sheet_id
+val sheet_id : int -> sheet_id
 
 type row_id
 val show_row_id : show row_id
