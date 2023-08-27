@@ -135,6 +135,25 @@ functor Make(M : AUTH) = struct
 			cs' <- columns p.Nam;
 			return (List.append cs cs')
     end
+
+    structure Table = struct
+	fun list [ts] (fl : folder ts) (labels : $(map (fn _ => string) ts))
+		 (jsons : $(map json ts)) (tname : string) =
+	    fields <- return (@foldR [fn _ => string] [fn _ => string]
+			      (fn [nm ::_] [t ::_] [r ::_] [[nm] ~ r]
+				  (label : string) (acc : string) =>
+				  case acc of
+				      "" => label
+				    | _ => acc ^ "," ^ label)
+			      "" fl labels);
+	    s <- api ("table/" ^ Urls.urlencode tname ^ "?sysparm_fields=" ^ fields);
+	    v <- return (@fromJson
+			  (@json_result (@json_list
+			    (@json_record_withOptional ! _ {} {}
+			      fl jsons labels)))
+			  s : result (list $(map option ts)));
+	    return v.Result
+    end
 end
 
 functor ThreeLegged(M : sig

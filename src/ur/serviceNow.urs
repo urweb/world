@@ -48,4 +48,13 @@ functor Make(M : AUTH) : sig
 	val list : transaction (list tabl)
 	val columns : string -> transaction (list column)
     end
+
+    structure Table : sig
+	val list : ts ::: {Type}
+		   -> folder ts
+		   -> $(map (fn _ => string) ts) (* labels in JSON *)
+		   -> $(map Json.json ts)
+		   -> string (* table name *)
+		   -> transaction (list $(map option ts))
+    end
 end

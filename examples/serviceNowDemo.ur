@@ -50,3 +50,17 @@ val main =
 	    </xml>) ts}
 	  </table>
 	</body></xml>
+
+val incidents =
+    is <- S.Table.list {Description = "description",
+			Severity = "severity"} "incident";
+    return <xml><body>
+      <table>
+	<tr><th>Description</th> <th>Severity</th></tr>
+
+	{List.mapX (fn {Description = d : option string,
+			Severity = s : option int} => <xml>
+	  <tr><td>{[d]}</td> <td>{[s]}</td></tr>
+	</xml>) is}
+      </table>
+    </body></xml>
