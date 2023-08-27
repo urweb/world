@@ -24,6 +24,42 @@ type result a = {
 }
 fun json_result [a] (_ : json a) : json (result a) = json_record {Result = "result"}
 
+type tabl = {
+     Nam : string
+}
+val _ : json tabl = json_record {Nam = "name"}
+
+type reference = {
+     Value : string
+}
+val _ : json reference = json_record {Value = "value"}
+
+type tabl' = {
+     Id : string,
+     Nam : string,
+     Parent : option reference
+}
+val _ : json tabl' = json_record_withOptional {Id = "sys_id", Nam = "name"}
+					      {Parent = "super_class"}
+
+type tabl'' = {
+     Id : string,
+     Nam : string
+}
+val _ : json tabl'' = json_record {Id = "sys_id", Nam = "name"}
+
+type column = {
+     Nam : string,
+     Typ : string
+}
+
+type column' = {
+     Nam : option string,
+     Typ : option reference
+}
+val _ : json column' = json_record_withOptional {} {Nam = "element",
+						    Typ = "internal_type"}
+
 functor Make(M : AUTH) = struct
     open M
 
@@ -49,6 +85,55 @@ functor Make(M : AUTH) = struct
         val list =
             s <- api "table/incident?sysparm_fields=description";
 	    return (fromJson s : result (list incident)).Result
+    end
+
+    structure Tables = struct
+        val list =
+            s <- api "table/sys_db_object?sysparm_fields=name";
+	    return (fromJson s : result (list tabl)).Result
+
+	fun get tabl =
+	    s <- api ("table/sys_db_object?sysparm_fields=sys_id,name,super_class&sysparm_query=super_classISNOTEMPTY^name=" ^ Urls.urlencode tabl);
+	    raw <- return (fromJson s : result (list tabl')).Result;
+	    case raw of
+		t :: [] => return (Some t)
+	      | [] => return None
+	      | _ => error <xml>Surprising multiple results when looking up table "{[tabl]}" in ServiceNow.</xml>
+
+	fun getById tid =
+	    s <- api ("table/sys_db_object?sysparm_fields=sys_id,name&sysparm_query=sys_id=" ^ Urls.urlencode tid);
+	    raw <- return (fromJson s : result (list tabl'')).Result;
+	    case raw of
+		t :: [] => return (Some t)
+	      | [] => return None
+	      | _ => error <xml>Surprising multiple results when looking up table #{[tid]} in ServiceNow.</xml>
+
+        fun columnsWithoutInheritance tabl =
+            s <- api ("table/sys_dictionary?sysparm_fields=element,internal_type&sysparm_query=name=" ^ Urls.urlencode tabl);
+	    raw <- return (fromJson s : result (list column')).Result;
+	    return (List.mapPartial (fn r =>
+					name <- r.Nam;
+					typ <- r.Typ;
+					if name = "" then
+					    None
+					else
+					    return {Nam = name, Typ = typ.Value}) raw)
+
+	fun columns tabl =
+	    cs <- columnsWithoutInheritance tabl;
+	    t <- get tabl;
+	    case t of
+		None => return cs
+	      | Some t =>
+		case t.Parent of
+		    None => return cs
+		  | Some {Value = p} =>
+		    p <- getById p;
+		    case p of
+			None => return cs
+		      | Some p =>
+			cs' <- columns p.Nam;
+			return (List.append cs cs')
     end
 end
 

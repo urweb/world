@@ -30,8 +30,22 @@ type incident = {
      Description : string
 }
 
+type tabl = {
+     Nam : string
+}
+
+type column = {
+     Nam : string,
+     Typ : string
+}
+
 functor Make(M : AUTH) : sig
     structure Incidents : sig
 	val list : transaction (list incident)
+    end
+
+    structure Tables : sig
+	val list : transaction (list tabl)
+	val columns : string -> transaction (list column)
     end
 end
