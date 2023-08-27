@@ -6,7 +6,7 @@ structure Scope : sig
 end
 
 signature AUTH = sig
-    val instance : string
+    val instance : transaction string
     val token : transaction (option string)
 end
 
@@ -20,7 +20,28 @@ functor ThreeLegged(M : sig
                         val onCompletion : transaction page
                     end) : sig
     val token : transaction (option string)
-    val instance : string
+    val instance : transaction string
+    val authorize : transaction page
+    val status : transaction xbody
+    val logout : transaction unit
+end
+
+type settings = {
+     ClientId : string,
+     ClientSecret : string,
+     Instance : string
+}
+
+functor ThreeLeggedDyn(M : sig
+			   val settings : transaction settings
+
+                           val https : bool
+
+                           val scopes : Scope.t
+                           val onCompletion : transaction page
+                    end) : sig
+    val token : transaction (option string)
+    val instance : transaction string
     val authorize : transaction page
     val status : transaction xbody
     val logout : transaction unit

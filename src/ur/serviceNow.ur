@@ -11,7 +11,7 @@ end
 
 signature AUTH = sig
     val token : transaction (option string)
-    val instance : string
+    val instance : transaction string
 end
 
 type incident = {
@@ -69,7 +69,9 @@ functor Make(M : AUTH) = struct
             None => error <xml>You must be logged into ServiceNow to use this feature.</xml>
           | Some tok => return tok
 
-    val prefix = "https://" ^ instance ^ ".service-now.com/api/now/"
+    val prefix =
+	instance <- instance;
+	return ("https://" ^ instance ^ ".service-now.com/api/now/")
 
     fun logged [a] (_ : show a) (t : transaction a) =
         v <- t;
@@ -78,6 +80,7 @@ functor Make(M : AUTH) = struct
 
     fun api url =
         tok <- token;
+	prefix <- prefix;
         debug ("ServiceNow GET: " ^ prefix ^ url);
         logged (WorldFfi.get (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False)
 
@@ -156,6 +159,105 @@ functor Make(M : AUTH) = struct
     end
 end
 
+type settings = {
+     ClientId : string,
+     ClientSecret : string,
+     Instance : string
+}
+
+functor ThreeLeggedDyn(M : sig
+                           val https : bool
+
+                           val settings : transaction settings
+
+                           val onCompletion : transaction page
+                    end) = struct
+    open M
+
+    val instance =
+        settings <- settings;
+	return settings.Instance
+
+    table secrets : { Secret : int,
+                      Token : string,
+                      Expires : time }
+      PRIMARY KEY Secret
+
+    task periodic 60 = fn () =>
+                          tm <- now;
+                          dml (DELETE FROM secrets
+                               WHERE Expires < {[addSeconds tm (-60)]})
+
+    cookie user : int
+
+    fun withToken {Token = tok, Expiration = seconds, ...} =
+        seconds <- return (Option.get (30 * 60) seconds);
+        secret <- rand;
+        tm <- now;
+        dml (INSERT INTO secrets(Secret, Token, Expires)
+             VALUES ({[secret]}, {[tok]}, {[addSeconds tm (seconds * 3 / 4)]}));
+        setCookie user {Value = secret,
+                        Expires = None,
+                        Secure = https}
+
+    open Oauth.MakeDyn(struct
+                           open M
+
+                           val settings =
+                               settings <- settings;
+                               url_base <- return ("https://" ^ settings.Instance ^ ".service-now.com/");
+                               return {ClientId = settings.ClientId,
+                                       ClientSecret = settings.ClientSecret,
+                                       AuthorizeUrl = bless (url_base ^ "oauth_auth.do"),
+                                       AccessTokenUrl = bless (url_base ^ "oauth_token.do")}
+
+                           val scope = None
+                           val hosted_domain = None
+
+                           val withToken = withToken
+                           val nameForScopeParameter = None
+                           val parseTokenResponse = None
+                       end)
+
+    val token =
+        c <- getCookie user;
+        case c of
+            None => return None
+          | Some n =>
+            oneOrNoRowsE1 (SELECT (secrets.Token)
+                           FROM secrets
+                           WHERE secrets.Secret = {[n]}
+                             AND secrets.Expires > CURRENT_TIMESTAMP)
+
+    val loggedIn = c <- getCookie user;
+        case c of
+            None => return False
+          | Some s =>
+            expiresO <- oneOrNoRowsE1 (SELECT (secrets.Expires)
+                                       FROM secrets
+                                       WHERE secrets.Secret = {[s]});
+            case expiresO of
+                None => return False
+              | Some exp =>
+                tm <- now;
+                return (tm < exp)
+    val logout = clearCookie user
+
+    val status =
+        li <- loggedIn;
+        li <- source li;
+        cur <- currentUrl;
+        return <xml>
+          <dyn signal={liV <- signal li;
+                       if liV then
+                           return <xml><button value="Log out of ServiceNow"
+                                               onclick={fn _ => rpc logout; set li False}/></xml>
+                       else
+                           return <xml><button value="Log into ServiceNow"
+                                               onclick={fn _ => redirect (url authorize)}/></xml>}/>
+        </xml>
+end
+
 functor ThreeLegged(M : sig
 			val instance : string
                         val client_id : string
@@ -166,6 +268,8 @@ functor ThreeLegged(M : sig
                         val onCompletion : transaction page
                     end) = struct
     open M
+
+    val instance = return instance
 
     table secrets : { Secret : int,
                       Token : string,
@@ -194,8 +298,8 @@ functor ThreeLegged(M : sig
     open Oauth.Make(struct
                         open M
 
-                        val authorize_url = bless ("https://" ^ instance ^ ".service-now.com/oauth_auth.do")
-                        val access_token_url = bless ("https://" ^ instance ^ ".service-now.com/oauth_token.do")
+                        val authorize_url = bless ("https://" ^ M.instance ^ ".service-now.com/oauth_auth.do")
+                        val access_token_url = bless ("https://" ^ M.instance ^ ".service-now.com/oauth_token.do")
 
                         val withToken = withToken
                         val scope = None
