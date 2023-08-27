@@ -1,0 +1,10 @@
+library ../src/ur
+rewrite all ServiceNowDemo/*
+database dbname=serviceNowDemo
+sql serviceNowDemo.sql
+safeGetDefault
+allow url https://*
+prefix http://localhost:8080/
+
+serviceNowSecrets
+serviceNowDemo
