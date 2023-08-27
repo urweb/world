@@ -6,6 +6,7 @@ structure Scope : sig
 end
 
 signature AUTH = sig
+    val instance : string
     val token : transaction (option string)
 end
 
@@ -19,10 +20,18 @@ functor ThreeLegged(M : sig
                         val onCompletion : transaction page
                     end) : sig
     val token : transaction (option string)
+    val instance : string
     val authorize : transaction page
     val status : transaction xbody
     val logout : transaction unit
 end
 
+type incident = {
+     Description : string
+}
+
 functor Make(M : AUTH) : sig
+    structure Incidents : sig
+	val list : transaction (list incident)
+    end
 end

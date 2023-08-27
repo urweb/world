@@ -11,10 +11,45 @@ end
 
 signature AUTH = sig
     val token : transaction (option string)
+    val instance : string
 end
+
+type incident = {
+     Description : string
+}
+val _ : json incident = json_record {Description = "description"}
+		
+type result a = {
+     Result : a
+}
+fun json_result [a] (_ : json a) : json (result a) = json_record {Result = "result"}
 
 functor Make(M : AUTH) = struct
     open M
+
+    val token =
+        toko <- token;
+        case toko of
+            None => error <xml>You must be logged into ServiceNow to use this feature.</xml>
+          | Some tok => return tok
+
+    val prefix = "https://" ^ instance ^ ".service-now.com/api/now/"
+
+    fun logged [a] (_ : show a) (t : transaction a) =
+        v <- t;
+        debug ("ServiceNow response: " ^ show v);
+        return v
+
+    fun api url =
+        tok <- token;
+        debug ("ServiceNow GET: " ^ prefix ^ url);
+        logged (WorldFfi.get (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False)
+
+    structure Incidents = struct
+        val list =
+            s <- api "table/incident?sysparm_fields=description";
+	    return (fromJson s : result (list incident)).Result
+    end
 end
 
 functor ThreeLegged(M : sig
