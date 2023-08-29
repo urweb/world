@@ -152,18 +152,13 @@ functor MakeDyn(M : sig
             dml (INSERT INTO states(State, Expires) VALUES({[state]}, {[addSeconds tm 300]}));
             settings <- settings;
 
-            redirect (bless (show settings.AuthorizeUrl
-                             ^ "?client_id=" ^ urlencode settings.ClientId
-                             ^ "&redirect_uri=" ^ urlencode (show (effectfulUrl authorized))
-                             ^ "&state=" ^ show state
-                             ^ "&response_type=code"
-                             ^ (case scope of
-                                    None => ""
-                                  | Some scope => "&" ^ Option.get "scope" nameForScopeParameter
-                                                  ^ "=" ^ urlencode scope)
-                             ^ (case hosted_domain of
-                                    None => ""
-                                  | Some hd => "&hd=" ^ urlencode hd)))
+            redirect (add_params_to_url settings.AuthorizeUrl
+              (("client_id", Some settings.ClientId),
+               ("redirect_uri", Some (show (effectfulUrl authorized))),
+               ("state", Some (show state)),
+               ("response_type", Some "code"),
+               (Option.get "scope" nameForScopeParameter, scope),
+               ("hd", hosted_domain)))
         end
 end
 

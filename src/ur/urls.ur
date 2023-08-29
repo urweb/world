@@ -134,3 +134,13 @@ fun base64url_encode' (getChar : int -> char) (urlVersion : bool) (len : int) =
 fun base64url_encode s = base64url_encode' (String.sub s) True (String.length s)
 fun base64url_encode_signature s = base64url_encode' (WorldFfi.byte s) True (WorldFfi.length s)
 fun base64_encode_signature s = base64url_encode' (WorldFfi.byte s) False (WorldFfi.length s)
+
+fun add_params_to_url [r] fl base_url params =
+    (* If there's a '?' in the base url, then it already has params, and we continue with '&'. *)
+    let val initialPrefix = if String.all (fn ch => ch <> #"?") (show base_url) then "?" else "&"
+        fun foldFun [nm ::_] [rest ::_] [[nm] ~ rest] (nm, op) (prefix, rst) = case op of
+                  None   => (prefix, rst)
+                | Some p => ("&", rst ^ prefix ^ nm ^ "=" ^ urlencode p)
+        val encoded_params = @foldUR [(string * option string)] [fn _ => (string * string)] foldFun (initialPrefix, "") fl params
+    in bless (show base_url ^ encoded_params.2)
+    end
