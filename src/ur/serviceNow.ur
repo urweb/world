@@ -55,10 +55,17 @@ type column = {
 
 type column' = {
      Nam : option string,
-     Typ : option reference
+     Typ : option reference,
+     Display : option bool
 }
 val _ : json column' = json_record_withOptional {} {Nam = "element",
-						    Typ = "internal_type"}
+						    Typ = "internal_type",
+						    Display = "display"}
+
+type full_table = {
+     Columns : list column,
+     DisplayColumn : option string
+}
 
 functor Make(M : AUTH) = struct
     open M
@@ -120,9 +127,9 @@ functor Make(M : AUTH) = struct
 					if name = "" then
 					    None
 					else
-					    return {Nam = name, Typ = typ.Value}) raw)
+					    return {Nam = name, Typ = typ.Value, Display = r.Display}) raw)
 
-	fun columns tabl =
+	fun columnsRaw tabl =
 	    cs <- columnsWithoutInheritance tabl;
 	    t <- get tabl;
 	    case t of
@@ -135,8 +142,19 @@ functor Make(M : AUTH) = struct
 		    case p of
 			None => return cs
 		      | Some p =>
-			cs' <- columns p.Nam;
+			cs' <- columnsRaw p.Nam;
 			return (List.append cs cs')
+
+	fun columns tabl =
+	    cs <- columnsRaw tabl;
+	    disp <- return (case List.find (fn c => c.Display = Some True) cs of
+				Some c => Some c.Nam
+			      | None =>
+				case List.find (fn c => c.Nam = "number" || c.Nam = "name" || c.Nam = "u_number" || c.Nam = "u_name") cs of
+				    Some c => Some c.Nam
+				  | None => None);
+	    return {Columns = List.mp (fn c => c -- #Display) cs,
+		    DisplayColumn = disp}
     end
 
     structure Table = struct

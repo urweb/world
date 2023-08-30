@@ -10,9 +10,13 @@ structure A = ServiceNow.ThreeLegged(struct
 structure S = ServiceNow.Make(A)
 
 fun table_ name =
-    cs <- S.Tables.columns name;
+    {Columns = cs, DisplayColumn = disp} <- S.Tables.columns name;
     return <xml><body>
       <h1>Columns</h1>
+
+      {case disp of
+	   None => <xml></xml>
+	 | Some disp => <xml><p>Display column is: <b>{[disp]}</b>.</p></xml>}
 
       <table>
 	<tr><th>Name</th> <th>Type</th></tr>

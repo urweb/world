@@ -60,6 +60,11 @@ type column = {
      Typ : string
 }
 
+type full_table = {
+     Columns : list column,
+     DisplayColumn : option string (* name of column to use in summarizing a row of this table, e.g. in a list of several rows somewhere *)
+}
+
 functor Make(M : AUTH) : sig
     structure Incidents : sig
 	val list : transaction (list incident)
@@ -67,7 +72,7 @@ functor Make(M : AUTH) : sig
 
     structure Tables : sig
 	val list : transaction (list tabl)
-	val columns : string -> transaction (list column)
+	val columns : string -> transaction full_table
     end
 
     structure Table : sig
