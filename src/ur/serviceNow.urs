@@ -11,7 +11,7 @@ signature AUTH = sig
 end
 
 functor ThreeLegged(M : sig
-			val instance : string
+                        val instance : string
                         val client_id : string
                         val client_secret : string
                         val https : bool
@@ -51,7 +51,7 @@ type incident = {
      Description : string
 }
 
-type tabl = {
+type table_name = {
      Nam : string
 }
 
@@ -60,22 +60,27 @@ type column = {
      Typ : string
 }
 
+type full_table = {
+     Columns : list column,
+     DisplayColumn : option string
+}
+
 functor Make(M : AUTH) : sig
     structure Incidents : sig
-	val list : transaction (list incident)
+        val list : transaction (list incident)
     end
 
     structure Tables : sig
-	val list : transaction (list tabl)
-	val columns : string -> transaction (list column)
+        val list : transaction (list table_name)
+        val columns : string -> transaction full_table
     end
 
     structure Table : sig
-	val list : ts ::: {Type}
-		   -> folder ts
-		   -> $(map (fn _ => string) ts) (* labels in JSON *)
-		   -> $(map Json.json ts)
-		   -> string (* table name *)
-		   -> transaction (list $(map option ts))
+        val list : ts ::: {Type}
+                   -> folder ts
+                   -> $(map (fn _ => string) ts) (* labels in JSON *)
+                   -> $(map Json.json ts)
+                   -> string (* table name *)
+                   -> transaction (list $(map option ts))
     end
 end

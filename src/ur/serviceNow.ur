@@ -18,47 +18,59 @@ type incident = {
      Description : string
 }
 val _ : json incident = json_record {Description = "description"}
-		
+
 type result a = {
      Result : a
 }
 fun json_result [a] (_ : json a) : json (result a) = json_record {Result = "result"}
 
-type tabl = {
+type table_name = {
      Nam : string
 }
-val _ : json tabl = json_record {Nam = "name"}
+val _ : json table_name = json_record {Nam = "name"}
 
 type reference = {
      Value : string
 }
 val _ : json reference = json_record {Value = "value"}
 
-type tabl' = {
-     Id : string,
-     Nam : string,
-     Parent : option reference
+type rawColumn = {
+     Nam : option string,
+     Typ : option reference,
+     Dis : option string
 }
-val _ : json tabl' = json_record_withOptional {Id = "sys_id", Nam = "name"}
-					      {Parent = "super_class"}
 
-type tabl'' = {
-     Id : string,
-     Nam : string
-}
-val _ : json tabl'' = json_record {Id = "sys_id", Nam = "name"}
+val _ : json rawColumn = json_record_withOptional {} {Nam = "element",
+                                                      Typ = "internal_type",
+                                                      Dis = "display"}
+
+(* Bools seem to come back from ServiceNow as strings that are either "true" or "false" *)
+fun unRawColumn (r : rawColumn) =
+    let fun stringToBool s =
+            if s = "true" then Some True
+            else if s = "false" then Some False
+            else None
+        val dis = (x <- Option.mp stringToBool r.Dis; x) in
+    name <- r.Nam;
+    typ <- r.Typ;
+    if name = "" then
+        None
+    else
+        return {Nam = name, Typ = typ.Value, Dis = dis}
+    end
 
 type column = {
      Nam : string,
      Typ : string
 }
 
-type column' = {
-     Nam : option string,
-     Typ : option reference
+type full_table = {
+     Columns : list column,
+     DisplayColumn : option string
 }
-val _ : json column' = json_record_withOptional {} {Nam = "element",
-						    Typ = "internal_type"}
+
+(* This should probably be upstreamed. *)
+fun oAlt o1 o2 = case o1 of Some _ => o1 | None => o2
 
 functor Make(M : AUTH) = struct
     open M
@@ -70,92 +82,94 @@ functor Make(M : AUTH) = struct
           | Some tok => return tok
 
     val prefix =
-	instance <- instance;
-	return ("https://" ^ instance ^ ".service-now.com/api/now/")
+        instance <- instance;
+        return ("https://" ^ instance ^ ".service-now.com/api/now/")
 
     fun logged [a] (_ : show a) (t : transaction a) =
         v <- t;
         debug ("ServiceNow response: " ^ show v);
         return v
 
-    fun api url =
+    fun api [a] (j : json a) (url : string) : transaction a =
         tok <- token;
-	prefix <- prefix;
+        prefix <- prefix;
         debug ("ServiceNow GET: " ^ prefix ^ url);
-        logged (WorldFfi.get (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False)
+        raw <- logged (WorldFfi.get (bless (prefix ^ url)) (WorldFfi.addHeader WorldFfi.emptyHeaders "Authorization" ("Bearer " ^ tok)) False);
+        return (fromJson raw : result a).Result
 
     structure Incidents = struct
-        val list =
-            s <- api "table/incident?sysparm_fields=description";
-	    return (fromJson s : result (list incident)).Result
+        val list = @@api [list incident] _ "table/incident?sysparm_fields=description"
     end
 
     structure Tables = struct
-        val list =
-            s <- api "table/sys_db_object?sysparm_fields=name";
-	    return (fromJson s : result (list tabl)).Result
+        val list = @@api [list table_name] _ "table/sys_db_object?sysparm_fields=name"
 
-	fun get tabl =
-	    s <- api ("table/sys_db_object?sysparm_fields=sys_id,name,super_class&sysparm_query=super_classISNOTEMPTY^name=" ^ Urls.urlencode tabl);
-	    raw <- return (fromJson s : result (list tabl')).Result;
-	    case raw of
-		t :: [] => return (Some t)
-	      | [] => return None
-	      | _ => error <xml>Surprising multiple results when looking up table "{[tabl]}" in ServiceNow.</xml>
+        fun getParent tableName =
+            tableList <- @@api
+                [list {Parent : reference}]
+                (@json_list <| json_record {Parent = "super_class"})
+                ("table/sys_db_object?sysparm_fields=super_class&sysparm_query=super_classISNOTEMPTY^name=" ^ Urls.urlencode tableName);
+            case tableList of
+                [] => return None
+              | t :: [] =>
+                (parentTable <- @@api [list table_name] _ ("table/sys_db_object?sysparm_fields=name&sysparm_query=sys_id=" ^ Urls.urlencode t.Parent.Value);
+                case parentTable of
+                    pName :: [] => return <| Some pName.Nam
+                  | [] => error <xml>ServiceNow said that table #"{[t.Parent.Value]}" exists, but it weirdly has no name.</xml>
+                  | _ => error <xml>Surprising multiple results when looking up table #"{[t.Parent.Value]}" in ServiceNow.</xml>)
+              | _ => error <xml>Surprising multiple results when looking up table "{[tableName]}" in ServiceNow.</xml>
 
-	fun getById tid =
-	    s <- api ("table/sys_db_object?sysparm_fields=sys_id,name&sysparm_query=sys_id=" ^ Urls.urlencode tid);
-	    raw <- return (fromJson s : result (list tabl'')).Result;
-	    case raw of
-		t :: [] => return (Some t)
-	      | [] => return None
-	      | _ => error <xml>Surprising multiple results when looking up table #{[tid]} in ServiceNow.</xml>
+        fun columnsWithoutInheritance tableName =
+            raw <- @@api [list rawColumn] _ ("table/sys_dictionary?sysparm_fields=element,internal_type,display&sysparm_query=name=" ^ Urls.urlencode tableName);
+            return <| List.mapPartial unRawColumn raw
 
-        fun columnsWithoutInheritance tabl =
-            s <- api ("table/sys_dictionary?sysparm_fields=element,internal_type&sysparm_query=name=" ^ Urls.urlencode tabl);
-	    raw <- return (fromJson s : result (list column')).Result;
-	    return (List.mapPartial (fn r =>
-					name <- r.Nam;
-					typ <- r.Typ;
-					if name = "" then
-					    None
-					else
-					    return {Nam = name, Typ = typ.Value}) raw)
+        fun columnsWithDis tableName =
+            cs <- columnsWithoutInheritance tableName;
+            p <- getParent tableName;
+            case p of
+                None => return cs
+              | Some pName =>
+                cs' <- columnsWithDis pName;
+                return (cs `List.append` cs')
+                (* The order of appending matters here.  A child table may have
+                   a different display field than a parent, so we should search
+                   through them in order from child to parent.  See comment below
+                   for more detail. *)
 
-	fun columns tabl =
-	    cs <- columnsWithoutInheritance tabl;
-	    t <- get tabl;
-	    case t of
-		None => return cs
-	      | Some t =>
-		case t.Parent of
-		    None => return cs
-		  | Some {Value = p} =>
-		    p <- getById p;
-		    case p of
-			None => return cs
-		      | Some p =>
-			cs' <- columns p.Nam;
-			return (List.append cs cs')
+        (* From https://docs.servicenow.com/bundle/tokyo-platform-administration/page/administer/field-administration/task/t_SelectTheDisplayValue.html
+           Reference fields look for the display value in the following order:
+           a. A field with display=true in the system dictionary on the lowest sub-table for extended tables.
+           b. A field with display=true in the system dictionary on the parent table.
+           c. A field named name or u_name.
+           d. The Created on field of the referenced record.
+         *)
+
+        fun columns tabl =
+            cs <- columnsWithDis tabl;
+            let val display =
+                List.find (fn x => x.Dis = Some True) cs `oAlt`
+                List.find (fn x => x.Nam = "name" || x.Nam = "u_name") cs `oAlt`
+                List.find (fn x => x.Nam = "sys_created_on") cs
+            in return {Columns = List.mp (fn x => x -- #Dis) cs,
+                       DisplayColumn = Option.mp (fn x => x.Nam) display}
+            end
+
     end
 
     structure Table = struct
-	fun list [ts] (fl : folder ts) (labels : $(map (fn _ => string) ts))
-		 (jsons : $(map json ts)) (tname : string) =
-	    fields <- return (@foldR [fn _ => string] [fn _ => string]
-			      (fn [nm ::_] [t ::_] [r ::_] [[nm] ~ r]
-				  (label : string) (acc : string) =>
-				  case acc of
-				      "" => label
-				    | _ => acc ^ "," ^ label)
-			      "" fl labels);
-	    s <- api ("table/" ^ Urls.urlencode tname ^ "?sysparm_fields=" ^ fields);
-	    v <- return (@fromJson
-			  (@json_result (@json_list
-			    (@json_record_withOptional ! _ {} {}
-			      fl jsons labels)))
-			  s : result (list $(map option ts)));
-	    return v.Result
+        fun list [ts] (fl : folder ts) (labels : $(map (fn _ => string) ts))
+                 (jsons : $(map json ts)) (tname : string) =
+            fields <- return (@foldR [fn _ => string] [fn _ => string]
+                              (fn [nm ::_] [t ::_] [r ::_] [[nm] ~ r]
+                                  (label : string) (acc : string) =>
+                                  case acc of
+                                      "" => label
+                                    | _ => acc ^ "," ^ label)
+                              "" fl labels);
+            @@api
+                [list $(map option ts)]
+                (@json_list (@json_record_withOptional ! _ {} {} fl jsons labels))
+                ("table/" ^ Urls.urlencode tname ^ "?sysparm_fields=" ^ fields)
     end
 end
 
@@ -176,7 +190,7 @@ functor ThreeLeggedDyn(M : sig
 
     val instance =
         settings <- settings;
-	return settings.Instance
+        return settings.Instance
 
     table secrets : { Secret : int,
                       Token : string,
@@ -259,7 +273,7 @@ functor ThreeLeggedDyn(M : sig
 end
 
 functor ThreeLegged(M : sig
-			val instance : string
+                        val instance : string
                         val client_id : string
                         val client_secret : string
                         val https : bool
