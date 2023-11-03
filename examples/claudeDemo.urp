@@ -1,0 +1,10 @@
+library ../src/ur
+rewrite all ClaudeDemo/*
+database dbname=claudeDemo
+sql claudeDemo.sql
+safeGetDefault
+allow url https://*
+prefix http://localhost:8080/
+
+claudeSecrets
+claudeDemo
