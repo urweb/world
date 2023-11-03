@@ -49,5 +49,7 @@ functor Make(M : sig
 
     fun complete arg =
         r <- api "complete" (toJson arg);
-        return (fromJson r : complete_result).Completion
+        r <- return (String.trim (fromJson r : complete_result).Completion);
+        debug ("Claude: " ^ r);
+        return r
 end
